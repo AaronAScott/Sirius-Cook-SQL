@@ -1,0 +1,2824 @@
+Option Strict Off
+Option Explicit On
+Imports System.Data.Common
+Imports System.Data.SqlClient
+Imports System.IO
+Imports System.Text.RegularExpressions
+Imports Org.BouncyCastle.Asn1
+Imports vb = Microsoft.VisualBasic
+Imports System.Diagnostics
+Module SiriusCook_Module1
+	'**************************************************
+	' SiriusCook SQL program module 1
+	' SIRIUSCOOK_MODULE1.BAS
+	' Written: November 2017
+	' Programmer: Aaron Scott
+	' Copyright 1997-2017 Sirius Software All Rights Reserved
+	'**************************************************
+
+	' Declare variables available throughout the program
+
+	Public DB As New SqlConnection
+	Public BackupRestorePerformed As Boolean
+
+	' Declare a public enum for the backup function
+
+	Public Enum BackupResult
+		Succeeded
+		Canceled
+		Failed
+	End Enum
+
+	' Create an Enum for the 4 components of a color theme.
+
+	Public Enum ThemeItem
+		All
+		MainWindow
+		BackgroundColorNumber
+		TextColorNumber
+		FontNumber
+	End Enum
+
+	' Declare an Enum fo the types of substitions of Unicode characters.
+	Public Enum UnicodeSubstitute
+		None
+		RTF
+		HTML
+	End Enum
+
+	' Declare variables local to this module
+
+	' Data access objects for the control table.
+
+	Private ControlDS As DataSet
+	Private ControlTable As DataTable
+
+	Private Structure strIngredient
+		Dim Quantity As Single
+		Dim Unit As String
+		Dim IngredientName As String
+	End Structure
+	'*******************************************************
+	'
+	' Sub to fill the font list
+	'
+	'*******************************************************
+	Public Sub FillFontList(L As Object)
+
+		' Declare variables
+
+		Dim jj As Integer
+		Dim zx As String
+		Dim installedFontCollection As New Drawing.Text.InstalledFontCollection()
+
+		If TypeOf (L) Is ListBox Or TypeOf (L) Is ComboBox Then
+			L.Items.Clear()
+			For jj = 0 To installedFontCollection.Families.Length - 1
+				zx = installedFontCollection.Families(jj).Name
+				L.Items.Add(zx)
+			Next jj
+		End If
+	End Sub
+
+	'**************************************************
+	'
+	' Function to check for apparent validity in an
+	' email address.
+	'
+	'**************************************************
+	Public Function ValidateEmailAddress(ByRef Email As String, Optional ByRef ErrMsg As String = "", Optional AddressType As Integer = 1) As Boolean
+
+		' Declare variables
+
+		Dim Valid As Boolean
+		Dim v As Boolean
+		Dim xx As String
+		Dim zx As String
+		Const ValidDomains As String = ".com,.net,.gov,.edu,.org,.us"
+
+		' Set the default return values
+
+		Valid = True
+		ErrMsg = ""
+
+		' Check for obvious problems with the Email address
+
+		If Email.Trim <> "" Then
+
+			' Begin looking for obvious problems.
+
+			If Email.IndexOf(" ") > 0 Then
+				Valid = False
+				ErrMsg = "Email address may not contain spaces."
+			End If
+
+			If Email.IndexOf("@@") > 0 Then
+				Valid = False
+				ErrMsg = "Email address may contain only one ""@"" symbol."
+			End If
+
+			If AddressType = 1 And Email.IndexOf("@") = 0 Then
+				Valid = False
+				ErrMsg = "Email address does not contain ""@"" symbol."
+			End If
+
+			xx = ValidDomains
+			If GetControlItem("ValidDomains") <> "" Then xx &= "," & GetControlItem("ValidDomains")
+			zx = xx
+			v = False
+			Do While zx <> ""
+				If InStr(1, Email, ParseString(zx), 1) > 0 Then
+					v = True
+					Exit Do
+				End If
+			Loop
+			If Not v Then ErrMsg = "No valid domain (" & xx & ") found."
+			If Valid Then Valid = v
+		Else
+			Valid = False ' Blank is not valid
+		End If
+
+		' Return the status
+
+		ValidateEmailAddress = Valid
+
+	End Function
+
+	'**************************************************
+	'
+	' Sub to make a backup copy of the current database.
+	'
+	'**************************************************
+	Public Function BackupDatabase(DatabaseName As String) As BackupResult
+
+		' Declare variables
+
+		Dim jj As Integer
+		Dim DBName As String = ""
+		Dim zx As String
+		Dim QuietBackup As Microsoft.VisualBasic.FileIO.UIOption
+
+		' Check for other users
+
+		If CheckForOtherUsers() = DialogResult.Cancel Then Return BackupResult.Canceled
+
+		' Get the name of the database without the path
+
+		For jj = DatabaseName.Length To 1 Step -1
+			If DatabaseName.Substring(jj - 1, 1) = "\" Then
+				DBName = DatabaseName.Substring(jj + 1 - 1)
+				Exit For
+			End If
+		Next jj
+
+		' Get the backup path
+
+		BackupPath = GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "BackupPath")
+
+		' Inform the user about where the backup will be
+		' performed.
+
+		If MsgBox("Backup will be saved in " & AddDirSeparator(BackupPath) & DBName.ToLower() & ".SC." & Choose(Weekday(Now), "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat") & "." & vbCrLf & vbCrLf & "Would you like to perform this backup now?", MsgBoxStyle.Question + MsgBoxStyle.YesNo, "Backup Database") = MsgBoxResult.No Then Return BackupResult.Canceled
+
+		' Close the database
+
+		frmMain.BackupRestoreStatus.Image = My.Resources.Backup
+		frmMain.BackupRestoreStatus.Text = "Closing Database"
+		My.Application.DoEvents()
+
+		' Have the main form do the database close, so it can close the cookbook library too.
+
+		frmMain.CloseFile_Click(frmMain.mnuCloseFile, New EventArgs)
+
+		' Stop the SQL server
+
+		frmMain.BackupRestoreStatus.Image = My.Resources.Backup
+		frmMain.BackupRestoreStatus.Text = "Stopping SQL Service"
+		My.Application.DoEvents()
+
+		Dim TempConnection As New SqlConnection("Data Source=" & ServerName & ";database='';integrated security=true")
+		TempConnection.Open()
+		Dim Command As New SqlCommand("SHUTDOWN;", TempConnection)
+		Command.ExecuteNonQuery()
+		Command.Dispose()
+
+		' Get the Quiet Backup option.
+
+		If GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "QuietBackup", "True") = "True" Then QuietBackup = Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs Else QuietBackup = FileIO.UIOption.AllDialogs
+
+		' Copy the database file to a backup file.  If quiet backup is selected, set
+		' the overwrite flag.  Otherwise, use the user interface option.
+
+		Try
+			frmMain.BackupRestoreStatus.Text = "Backing up " & DatabaseName
+			My.Application.DoEvents()
+			My.Computer.FileSystem.CopyFile(DatabaseName, BackupPath & DBName & ".SC." & Choose(Weekday(Now), "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"), QuietBackup)
+
+			' Get the name of the log file.
+
+			zx = SRep(DatabaseName, 1, ".mdf", "_log.ldf", CompareMethod.Text)
+
+			' Copy the log file to a backup file.
+
+			frmMain.BackupRestoreStatus.Text = "Backing up " & zx
+			My.Application.DoEvents()
+			My.Computer.FileSystem.CopyFile(zx, BackupPath & SRep(DBName, 1, ".mdf", "_log.ldf", CompareMethod.Text) & ".SC." & Choose(Weekday(Now), "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"), QuietBackup)
+
+			' Indicate that the backup succeeded.
+
+			SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "Backup", "Completed")
+
+			Return BackupResult.Succeeded
+
+		Catch e As Exception
+			MsgBox("Backup failed." & vbCrLf & e.Message, MsgBoxStyle.Exclamation, "Backup Database")
+
+			' Indicate that the backup succeeded.
+
+			SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "Backup", "Failed")
+			SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "BackupRestoreError", e.Message)
+
+			Return BackupResult.Failed
+		End Try
+	End Function
+	'**************************************************
+	'
+	' Function to return the "index" of a specially-
+	' named control.
+	' Input:  EventSender  = An object.  Its name
+	'                   must end with "_x" where "x"
+	'                   is the index value, eg. "control_1"
+	' Output:         = The value of the pseudo-index
+	'**************************************************
+	Public Function GetControlIndex(ByVal eventSender As System.Object) As Integer
+
+		' Declare variables
+
+		Dim zx1 As String
+		Dim zx2 As String
+
+		' Get the text of the index.  If we have a control the name of which
+		' begins with underscore, strip that off before looking for the 
+		' pseudo-index number.
+
+		zx1 = eventSender.name
+		If zx1.Substring(0, 1) = "_" Then zx1 = zx1.Substring(1)
+		zx2 = ParseString(zx1, "_")
+
+		' Variable zx1 now contrains only the text of the index.  Return that value.
+
+		GetControlIndex = Val(zx1)
+
+	End Function
+
+	'*******************************************************************
+
+	' Sub to create a new database.  The SQL database template is
+	' copied over to the new database.
+
+	'*******************************************************************
+	Public Sub CreateNewDatabase()
+
+		' Declare variables
+
+		Dim xx As Integer
+		Dim NewDatabase As String
+
+		' Get the name of the new database.
+
+		frmMain.SaveFileDialog1.AddExtension = True
+		frmMain.SaveFileDialog1.Filter = "Microsoft SQL Files (*.mdf)|*.mdf"
+		frmMain.SaveFileDialog1.DefaultExt = "mdf"
+		frmMain.SaveFileDialog1.InitialDirectory = System.IO.Directory.GetCurrentDirectory
+		frmMain.SaveFileDialog1.OverwritePrompt = True
+		frmMain.SaveFileDialog1.SupportMultiDottedExtensions = True
+		xx = frmMain.SaveFileDialog1.ShowDialog()
+
+		' If the dialog returns a valid file name, proceed.
+
+		If xx = DialogResult.OK Then
+
+			' Copy the master database to the specified database.
+
+			NewDatabase = frmMain.SaveFileDialog1.FileName
+			Try
+				My.Computer.FileSystem.CopyFile(My.Application.Info.DirectoryPath & "\SiriusCook Master.mdf.template", NewDatabase, True)
+				Databasename = NewDatabase
+
+				' Inform the user how to log on to the new database
+
+				MsgBox("Database " & Databasename & " has been successfully created.", MsgBoxStyle.Information, "Create New Database")
+
+				OpenADatabase(NewDatabase)
+			Catch e As Exception
+				MsgBox("Failed to create new database." & vbCrLf & e.Message, MsgBoxStyle.Exclamation, ProgramName)
+
+			End Try
+		End If
+
+	End Sub
+	'*******************************************************************
+
+	' Function to open a database and return the open status.
+	' In fact, we only open a connection to the database for the sole
+	' purpose of determining it can be accessed.  All of the datasets
+	' access their tables regardless of this connection.
+
+	'*******************************************************************
+	Public Function OpenADatabase(Optional OpenDatabaseName As String = "", Optional ReOpen As Boolean = False) As Boolean
+
+		' Declare variables
+
+		Dim o As Boolean
+		Dim zx As String
+		Dim CookbooksDA As New SqlDataAdapter
+		Dim CookbooksDS As New DataSet
+		Dim Command As New SqlCommand
+
+		' Put up a status message while we do this.
+
+		frmMain.StatusLabel.Text = "Opening " & Databasename & "..."
+		System.Windows.Forms.Application.DoEvents() '  Allow time to update
+
+		' If no database is specified, use the last one accessed.
+
+		If OpenDatabaseName = "" Then My.Settings.LastDatabaseUsed = OpenDatabaseName
+
+		' Remember the datapath and the database name.
+
+		Datapath = GetPath(OpenDatabaseName)
+		Databasename = OpenDatabaseName
+
+		' Now try to open a connection.  We'll return True or False depending on whether
+		' we succeed.
+
+		o = True
+		Try
+			If DB.State = ConnectionState.Open Then CloseDatabase()
+
+			DB.ConnectionString = MyConnectionString()
+			DB.Open()
+
+			' Initialize all the data adapters.
+
+			InitializeDataAdapters()
+
+			' Attempt to open the cookbooks table.  If we cannot open it, this is not an SiriusCook SQL
+			' database. 
+
+			Try
+
+				CookbooksDA.SelectCommand = CookbooksSelectCommand()
+				CookbooksDA.Fill(CookbooksDS, "Table")
+				CookbooksDS.Dispose()
+
+				' Fill the control table dataset.
+
+				ControlDS = New DataSet
+				ControlDA.Fill(ControlDS, "Table")
+				ControlTable = ControlDS.Tables("Table")
+
+				' Version Checking!!!  Any processing which a future
+				' version may necessitate will take place here
+
+				If VersionChecking(GetControlItem("DBVersion")) <> 0 Then
+					DB.Close()
+					o = False
+				Else
+
+					' If a backup or restore was performed prior to opening this dataabse, clear
+					' the status of the DatabaseChanged flag
+
+					If BackupRestorePerformed Then DatabaseChanged = False
+
+					' If a backup or restore was performed prior to opening this dataabse, clear
+					' the status of the DatabaseChanged property.
+
+					zx = GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "Backup")
+					If zx = "" Then zx = GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "Restore")
+					Select Case zx
+						Case "Completed"
+							DatabaseChanged = False
+							SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "Backup", "")
+							SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "Restore", "")
+							SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "BackupRestoreError", "")
+						Case "Failed"
+							zx = GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "BackupRestoreError")
+							MsgBox("A previous backup or restore operation failed.  The error was """ & zx & """." & vbCrLf & vbCrLf & "You should correct the problem, and re-perform the operation as soon as possible.", MsgBoxStyle.Information, "Backup or Restore Failure")
+							If GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "Backup") = "Failed" Then
+								frmMain.BackupRestoreStatus.Image = My.Resources.Backup
+								frmMain.BackupRestoreStatus.Text = "A Previous Backup Failed"
+							Else
+								frmMain.BackupRestoreStatus.Image = My.Resources.Restore
+								frmMain.BackupRestoreStatus.Text = "A Previous Restore Failed"
+							End If
+					End Select
+
+
+					' Display the database name on the form caption
+
+					frmMain.Text = ProgramName & " (" & Databasename.ToLower() & ")"
+
+					'  Show the user name on the tool bar
+
+					frmMain.UserLabel.Text = "User: " & GetControlItem("CooksName")
+
+				End If
+			Catch ex2 As Exception
+				o = False
+				MsgBox(Databasename & " cannot be opened or is not a SiriusCook SQL Database.", MsgBoxStyle.Information, ProgramName)
+				MsgBox(ex2.Message, MsgBoxStyle.Information, ProgramName)
+			End Try
+
+		Catch ex As Exception
+			MsgBox("Cannot open database." & vbCrLf & ex.Message, MsgBoxStyle.Exclamation, ProgramName)
+			o = False
+
+		End Try
+
+		' Enable menu items
+
+		EnableMenus(o)
+
+		' If we succeeded, do things that require an open database.
+
+		If o Then
+
+			' Update the Most Recently Used list in the File
+			' menu.
+
+			UpdateMRU(Databasename)
+		End If
+
+		' Clear status message.
+
+		frmMain.StatusLabel.Text = ""
+		System.Windows.Forms.Application.DoEvents() '  Allow time to update
+
+		Return o
+	End Function
+	'**********************************************************
+	'
+	' Sub to close a database
+	'
+	'**********************************************************
+	Public Sub CloseDatabase()
+
+		' Declare variables
+
+		Dim jj As Integer
+
+		' Unload any forms except the main form.
+
+		For jj = My.Application.OpenForms.Count - 1 To 0 Step -1
+			If Not My.Application.OpenForms.Item(jj) Is frmMain Then My.Application.OpenForms(jj).Close()
+		Next jj
+
+		If DbOpen Then
+
+			' Dispose of the control table dataset.
+
+			ControlDS.Dispose()
+
+		End If
+
+		' Close the database if it is open.  Do not rely on the DbOpen flag, since it
+		' may be cleared.
+
+		If DB.State = ConnectionState.Open Then DB.Close()
+
+		' Detach the data adapters, which will remove the connection to the database.
+
+		DetachDataAdapters()
+
+		' Indicate the database is now closed.
+
+		DbOpen = False
+
+		' Disable the menu options which depend on an open database
+
+		EnableMenus(False)
+
+		' Disble cookbook options that depend on an open database
+
+		EnableCookbookOptions(False)
+
+		' Clear "recent" and "favorites" menus.
+
+		frmMain.mnuRecent.DropDownItems.Clear()
+		frmMain.mnuFavorites.DropDownItems.Clear()
+
+		'  Show no user name on the tool bar
+
+		frmMain.UserLabel.Text = "User: "
+
+		' Display the program name on the form caption
+
+		frmMain.Text = ProgramName
+
+	End Sub
+	'*******************************************************************
+
+	' Function to return the path of a file name.
+
+	'*******************************************************************
+	Public Function GetPath(ByVal FileName As String) As String
+
+		' Declare variables
+
+		Dim jj As Integer
+		Dim Datapath As String = ""
+
+		If FileName.IndexOf("\") > 0 Then
+			For jj = FileName.Length To 1 Step -1
+				If FileName.Substring(jj - 1, 1) = "\" Then
+					Datapath = FileName.Substring(0, jj)
+					Exit For
+				End If
+			Next jj
+		End If
+
+		Return Datapath
+
+
+	End Function
+	'**************************************************
+	'
+	' Sub to enable or disable cookbook options.
+	'
+	'**************************************************
+	Public Sub EnableCookbookOptions(ByRef State As Boolean)
+
+		frmMain.mnuOpenBook.Enabled = State
+		frmMain.mnuDeleteBook.Enabled = State
+		frmMain.mnuMoveRecipes.Enabled = State
+		frmMain.mnuCookbookProperties.Enabled = State
+
+	End Sub
+
+
+	'**************************************************
+	'
+	' Function to return a string with all recognizable
+	' and common units of measure replaced with a
+	' standard format.
+	'
+	'**************************************************
+	Function StandardizeUnits(ByRef vNewValue As String) As String
+
+		' Declare variables
+
+		Dim jj As Integer
+		Dim zx0 As String
+		Dim zx1 As String
+		Dim zx2 As String
+
+		' First replace any abbreviations for units with
+		' a standard format.
+
+		zx0 = vNewValue
+		For jj = 1 To 40
+			zx1 = Choose(jj, " teaspoons ", " teaspoon ", " t ", " t. ", " tsp ", " tsp. ", " tablespoons ", " tablespoon ", " tbs ", " tbs. ", " tbl ", " tbl. ", " tbsp ", " tb ", " tbls ", " tbls. ", " c. ", " cup ", " c ", " cp ", " lb ", "lb. ", " lbs ", " lbs. ", "#", " pound ", " pounds ", " grams ", " gr ", " gr. ", " g. ", " g ", " kg ", " oz ", " oz. ", " can ", " pkg ", " pkg. ", " pckg. ", " l. ", " l ", " ml ")
+			zx2 = Choose(jj, " tsp. ", " tsp. ", " tsp. ", " tsp. ", " tsp. ", " tsp. ", " tbsp. ", " tbsp. ", " tbsp. ", " tbsp. ", " tbsp. ", " tbsp. ", " tbsp. ", "tbsp.", " tbsp. ", " tbsp. ", " cup ", " cup ", " cup ", " cup ", " lb. ", " lb. ", " lbs. ", " lbs.", " lb. ", " lb. ", " lbs. ", " g. ", " g. ", " g. ", " g. ", " g. ", " kg. ", " oz. ", " oz. ", " can ", " pkg. ", " pkg. ", " pkg. ", " l. ", " l. ", " ml. ")
+			zx0 = zx0.Replace(zx1, zx2)
+		Next jj
+
+		' Remove extra spaces and return the
+		' result.
+
+		Return zx0.Replace("  ", " ")
+
+	End Function
+	'**************************************************
+	'
+	' Sub to update and refill the Most Recently Used
+	' database slots of the FILE menu
+	'
+	'**************************************************
+	Public Sub UpdateMRU(ByRef DBName As String)
+
+		' Declare variables
+
+		Dim DbInList As Boolean
+		Dim jj As Integer
+		Dim j1 As Integer
+		Dim zx As String
+
+		' Always make the name initial-cap
+
+		DBName = Capitalize(DBName)
+
+		' See if this database is already among the last 4
+		' MRU databases and, if so, move the ones heretofor
+		' more recently used down.
+
+		DbInList = False
+		For jj = 1 To 4
+			zx = GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", CStr(jj), "")
+			If zx.Trim = DBName.ToLower() Then
+				DbInList = True
+				If jj > 1 Then
+					For j1 = jj - 1 To 1 Step -1
+						zx = GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", CStr(j1), "")
+						SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", CStr(j1 + 1), zx)
+					Next j1
+					SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", "1", DBName.ToLower())
+				End If
+			End If
+		Next jj
+
+		' Shuffle any already-defined MRUs down and drop
+		' off number 4 (least recently used) if the
+		' database just opened was not in the last 4 MRUs
+
+		If DbInList = False Then
+			zx = GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", "1", "")
+			If DBName.ToLower() <> zx.ToLower() And zx <> "" Then
+				For jj = 4 To 2 Step -1
+					zx = GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", CStr(jj - 1), "")
+					If zx.Trim <> "" Then
+						SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", CStr(jj), zx)
+					End If
+				Next jj
+			End If
+			SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", "1", DBName.ToLower())
+		End If
+
+		' Now refill the MRU slots
+
+		FillMRU()
+
+	End Sub
+	'**************************************************
+	'
+	' Sub to delete and refill the Most Recently Used
+	' database slots of the FILE menu
+	'
+	'**************************************************
+	Public Sub DeleteMRU(ByRef Index As Integer)
+
+		' Declare variables
+
+		Dim jj As Integer
+		Dim zx As String
+
+
+		' See if this database is among the last 4
+		' MRU databases and, if so, move the ones less
+		' recently used up.
+
+		For jj = Index To 4
+			zx = GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", CStr(jj + 1), "")
+			If zx <> "" Then
+				SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", CStr(jj), zx)
+			Else
+				If GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", CStr(jj), "") <> "" Then DeleteSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", CStr(jj))
+			End If
+		Next jj
+
+
+		' Now refill the MRU slots
+
+		FillMRU()
+
+	End Sub
+	'**************************************************
+	'
+	' Sub to fill the MRU slots in the FILE menu with
+	' the list of Most Recently Used databases
+	'
+	'**************************************************
+	Public Sub FillMRU()
+
+		' Declare variables
+
+		Dim jj As Integer
+		Dim zx As String
+		Dim m As ToolStripMenuItem
+
+		' See if any of the 4 MRU lines is defined.
+
+		For jj = 1 To 4
+			zx = GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "MRUList", CStr(jj), "")
+			m = Choose(jj, frmMain.MRU1, frmMain.MRU2, frmMain.MRU3, frmMain.MRU4)
+			If zx <> "" Then
+				m.Text = "&" & CStr(jj) & " " & zx
+				m.Visible = True
+				frmMain.MRUSeparator.Visible = True
+			Else
+				m.Visible = False
+			End If
+		Next jj
+		System.Windows.Forms.Application.DoEvents()
+	End Sub
+
+	'**************************************************
+	'
+	' Sub to enable or disable menu items based upon
+	' the State flag passed (true or false).
+	'
+	'**************************************************
+	Public Sub EnableMenus(ByRef State As Boolean)
+
+		' Set menu items to the specified state of enabled or disabled.
+
+		frmMain.mnuCloseFile.Enabled = State
+		frmMain.CookbookMenu.Enabled = State
+		frmMain.mnuRecent.Enabled = State
+		frmMain.mnuFavorites.Enabled = State
+		frmMain.mnuBackupDatabase.Enabled = State
+		frmMain.mnuRestoreDatabase.Enabled = Not State
+		frmMain.mnuCompactDatabase.Enabled = State
+		frmMain.mnuControlTableEditor.Enabled = State
+		frmMain.mnuCatalog.Enabled = State
+		frmMain.mnuSearchLibrary.Enabled = State
+		frmMain.mnuMaintainLinks.Enabled = State
+
+		' Fill or empty the Recent and Favorites menus.
+
+		FillRecentMenu(State)
+		FillFavoritesMenu(State)
+
+		System.Windows.Forms.Application.DoEvents() ' Allow system to update display
+
+	End Sub
+	'**************************************************
+
+	' Sub to compact the database.
+
+	'**************************************************
+	Public Sub CompactDatabase()
+
+		' Declare variables
+
+		Dim idx As DataTable
+		Dim jj As Integer
+		Dim TableName As String
+		Dim IndexName As String
+		Dim Command As SqlCommand
+
+		' Put up a status message.
+
+		frmMain.StatusLabel.Text = "Checking database integrity..."
+		System.Windows.Forms.Application.DoEvents()
+
+		' Check database for errors.
+
+		Command = New SqlCommand("DBCC CHECKDB('" & Databasename & "')", DB)
+		Command.CommandTimeout = 0 ' No timeout
+		Command.ExecuteNonQuery()
+
+		' Put up a status message.
+
+		frmMain.StatusLabel.Text = "Compacting database..."
+		System.Windows.Forms.Application.DoEvents()
+
+		' Create a command to compact the database, leaving 10% free space.
+
+		Command = New SqlCommand("DBCC SHRINKDATABASE('" & Databasename & "', 10)", DB)
+		Command.CommandTimeout = 0 ' No timeout: this can take a lot of time to compact a db
+		Command.ExecuteNonQuery()
+		Command.Dispose()
+
+		' Get a list of all indexes in the database.
+
+		idx = DB.GetSchema("Indexes")
+
+		' Rebuild all the indexes.
+
+		For jj = 0 To idx.Rows.Count - 1
+			IndexName = idx.Rows(jj).Item("constraint_name")
+			TableName = idx.Rows(jj).Item("table_name")
+			frmMain.StatusLabel.Text = "Rebuilding Index " & IndexName & " on table " & TableName & "..."
+			System.Windows.Forms.Application.DoEvents()
+			Command = New SqlCommand("ALTER INDEX " & IndexName & " ON " & TableName & " REBUILD;", DB)
+			Command.CommandTimeout = 0 ' No timeout: this can take a lot of time to rebuild an index
+			Command.ExecuteNonQuery()
+			Command.Dispose()
+		Next jj
+
+		' Clear status message.
+
+		frmMain.StatusLabel.Text = ""
+		System.Windows.Forms.Application.DoEvents()
+
+	End Sub
+	'**************************************************
+
+	' Sub to fill or clear the Recent menu.
+
+	'**************************************************
+	Public Sub FillRecentMenu(State As Boolean)
+
+		' Declare variables.
+
+		Dim jj As Integer
+		Dim da As New SqlDataAdapter
+		Dim ds As New DataSet
+		Dim dt As DataTable
+		Dim mi As ToolStripMenuItem
+
+		' If State is True, fill the menu with the most recent 10 recipes.
+
+		If State Then
+			da.SelectCommand = New SqlCommand("SELECT TOP (15) ID,ParentID,RecipeName from tblRecipes ORDER BY DateAdded DESC", DB)
+			da.Fill(ds, "Table")
+			dt = ds.Tables("Table")
+
+			If dt.Rows.Count > 0 Then
+				For jj = 0 To dt.Rows.Count - 1
+					mi = New ToolStripMenuItem(CStr(dt.Rows(jj)("RecipeName")))
+					mi.Tag = CStr(dt.Rows(jj)("ParentID")) & "," & CStr(dt.Rows(jj)("ID"))
+					AddHandler mi.Click, AddressOf frmMain.mnuRecent_ItemClick
+					frmMain.mnuRecent.DropDownItems.Add(mi)
+				Next jj
+			End If
+
+			' if State is false, clear the menu.
+
+		Else
+			For Each mi In frmMain.mnuRecent.DropDownItems
+				RemoveHandler mi.Click, AddressOf frmMain.mnuRecent_ItemClick
+			Next mi
+			frmMain.mnuRecent.DropDownItems.Clear()
+		End If
+
+		' Dispose of objects we created.
+
+		da.Dispose()
+		ds.Dispose()
+	End Sub
+	'**************************************************
+
+	' Sub to fill or clear the Favorites menu.
+
+	'**************************************************
+	Public Sub FillFavoritesMenu(State As Boolean)
+
+
+		' Declare variables.
+
+		Dim jj As Integer
+		Dim da As New SqlDataAdapter
+		Dim ds As New DataSet
+		Dim dt As DataTable
+		Dim mi As ToolStripMenuItem
+
+		' If State is True, fill the menu with the most recent 10 recipes.
+
+		If State Then
+			da.SelectCommand = New SqlCommand("SELECT ID,ParentID,RecipeName from tblRecipes WHERE Favorite=1 ORDER BY RecipeName", DB)
+			da.Fill(ds, "Table")
+			dt = ds.Tables("Table")
+
+			If dt.Rows.Count > 0 Then
+				For jj = 0 To dt.Rows.Count - 1
+					mi = New ToolStripMenuItem(CStr(dt.Rows(jj)("RecipeName")))
+					mi.Tag = CStr(dt.Rows(jj)("ParentID")) & "," & CStr(dt.Rows(jj)("ID"))
+					AddHandler mi.Click, AddressOf frmMain.mnuRecent_ItemClick
+					frmMain.mnuFavorites.DropDownItems.Add(mi)
+				Next jj
+			End If
+
+			' if State is false, clear the menu.
+
+		Else
+			For Each mi In frmMain.mnuFavorites.DropDownItems
+				RemoveHandler mi.Click, AddressOf frmMain.mnuRecent_ItemClick
+			Next mi
+			frmMain.mnuFavorites.DropDownItems.Clear()
+		End If
+
+		' Dispose of objects we created.
+
+		da.Dispose()
+		ds.Dispose()
+	End Sub
+	'**********************************************************
+	'
+	' Sub to perform database version-checking.
+	' Returns: 0 = Database version okay
+	'          1 = Database version NOT okay
+	'
+	'**********************************************************
+	Public Function VersionChecking(ByRef VersionText As String) As Integer
+
+		' Declare variables
+
+		Dim UpdateSuccessful As Boolean
+		Dim DBName As String = ""
+		Dim v1 As String
+		Dim p1 As String
+		Dim Command As SqlCommand = Nothing
+		Dim Transaction As SqlTransaction = Nothing
+
+		' Watch this spot for future version information!
+
+		v1 = ""
+		p1 = ""
+
+		VersionChecking = 0
+
+		' If the version stamp is blank, then we update it to a
+		' 1.0 level (since that is where version stamping is
+		' added).  Note that this is a DATABASE version
+		' and not a program version.
+
+		If VersionText = "" Then
+			PutControlItem("DBVersion", ProgramName & " Ver. " & "1.0")
+			VersionText = GetControlItem("DBVersion")
+		End If
+
+		' Get just the version number
+
+		v1 = VersionText.Substring(VersionText.IndexOf(" Ver. ") + 5)
+
+		' Get the program name
+
+		p1 = VersionText.Substring(0, VersionText.IndexOf(" Ver. ")).Trim
+
+		' If the program name does not match, alert the user.
+
+		If ProgramName.Substring(0, p1.Length) <> p1 Then
+			MsgBox(Databasename & " is not a " & ProgramName & " database.", MsgBoxStyle.Critical, ProgramName)
+			VersionChecking = 1
+			Exit Function
+		End If
+
+		' If the database version is less than that defined in
+		' frmMain, then we need to check for database upgrades
+
+		UpdateSuccessful = True
+		If Val(v1) < Val(DBVersion) Then
+
+			' Get the name of the database minus the path.
+
+			DBName = DatabaseNameNoPath()
+
+			' Advise user what's happening
+
+			Try
+				frmMain.StatusLabel.Text = "Upgrading Database"
+				My.Application.DoEvents()
+
+				' If the database hasn't been backed up, backup the database before upgrading.
+
+				If DatabaseChanged Then
+
+					' Inform the user an update must occur.
+
+					MsgBox("This database requires upgrading.  It will be backed up first, to allow for recovery in case of an upgrade failure.", MsgBoxStyle.Information, "Database Version Upgrade")
+
+					If BackupDatabase(Databasename) <> BackupResult.Succeeded Then Exit Function
+
+					' Initialize all the data adapters.
+
+					' Reopen the database
+
+					DB.ConnectionString = MyConnectionString()
+					DB.Open()
+
+					InitializeDataAdapters()
+
+					' Re-open the control table, which was
+					' open at the time the version checking routine was called.
+
+					ControlDS = New DataSet
+					ControlDA.Fill(ControlDS, "Table")
+					ControlTable = ControlDS.Tables("Table")
+
+					' If the database's backup state is okay, just alert the user than an upgrade is required.
+
+				Else
+					' Inform the user an update must occur.
+
+					MsgBox("This database requires upgrading.", MsgBoxStyle.Information, "Database Version Upgrade")
+
+				End If
+
+				' Begin update procedures.
+
+				' See if the database version is less than 1.01. If so, add the links table.
+
+				If Val(v1) < 1.01 Then
+
+					' Create the new links table
+
+					Transaction = DB.BeginTransaction
+					Command = New SqlCommand("CREATE TABLE [dbo].[tblLinks]([ID]  INT  NOT NULL IDENTITY (1,1),[LinkedID]  INT  NOT NULL,[LinkText]  NCHAR (50) NOT NULL,PRIMARY KEY CLUSTERED ([ID] ASC),CONSTRAINT Relation3 FOREIGN KEY (LinkedID) REFERENCES tblRecipes(ID) ON DELETE CASCADE ON UPDATE CASCADE) CREATE UNIQUE NONCLUSTERED INDEX LinkText ON [tblLinks] (LinkText ASC);", DB)
+					Command.Transaction = Transaction
+					Command.ExecuteNonQuery()
+
+					' Commit the changes.
+
+					Transaction.Commit()
+
+					' Mark as upgraded to 1.01.
+
+					If UpdateSuccessful Then PutControlItem("DBVersion", ProgramName & " Ver. 1.01")
+				End If
+
+				' See if the database version is less than 1.03.  If so, add the DateAdded field to the recipe
+				' table.
+
+				If Val(v1) < 1.03 Then
+
+					' Add the DateAdded field to the recipes table.
+
+					Transaction = DB.BeginTransaction
+					Command = New SqlCommand("ALTER TABLE [dbo].[tblRecipes] ADD [DateAdded]  DATE  NULL;", DB)
+					Command.Transaction = Transaction
+					Command.ExecuteNonQuery()
+					Command = New SqlCommand("UPDATE [dbo].[tblRecipes] SET [DateAdded]='01/01/2020';", DB)
+					Command.Transaction = Transaction
+					Command.ExecuteNonQuery()
+
+					' Commit the changes.
+
+					Transaction.Commit()
+
+					' Mark as upgraded to 1.03.
+
+					If UpdateSuccessful Then PutControlItem("DBVersion", ProgramName & " Ver. 1.03")
+				End If
+
+				' If the database version is less than 1.04, add the images table.
+
+				If Val(v1) < 1.04 Then
+
+					' Create the new images table
+
+					Transaction = DB.BeginTransaction
+					Command = New SqlCommand("CREATE TABLE [dbo].[tblImages] ([ID] Int  Not NULL IDENTITY (1, 1), [ParentID] Int Not NULL, [DocumentImage]  VARBINARY(MAX)  Not NULL  PRIMARY KEY CLUSTERED ([ID] ASC) CONSTRAINT Relation4 FOREIGN KEY (ParentID) REFERENCES tblRecipes(ID) ON DELETE CASCADE ON UPDATE CASCADE);", DB)
+					Command.Transaction = Transaction
+					Command.ExecuteNonQuery()
+
+					' Commit the changes.
+
+					Transaction.Commit()
+
+					' Mark as upgraded to 1.04.
+
+					If UpdateSuccessful Then PutControlItem("DBVersion", ProgramName & " Ver. 1.04")
+				End If
+
+				' If the database version is less than 1.05, increase the width of the "category" field.
+
+				If Val(v1) < 1.05 Then
+
+					' Create the new images table
+
+					Transaction = DB.BeginTransaction
+					Command = New SqlCommand("ALTER TABLE [dbo].[tblRecipes] ALTER COLUMN [Category] NVARCHAR (100) NOT NULL", DB)
+					Command.Transaction = Transaction
+					Command.ExecuteNonQuery()
+
+					' Commit the changes.
+
+					Transaction.Commit()
+
+					' Mark as upgraded to 1.05.
+
+					If UpdateSuccessful Then PutControlItem("DBVersion", ProgramName & " Ver. 1.05")
+				End If
+
+
+				' If the database version is less than 1.06, add the notes field.
+
+				If Val(v1) < 1.06 Then
+
+					' Create the new images table
+
+					Transaction = DB.BeginTransaction
+					Command = New SqlCommand("ALTER TABLE [dbo].[tblRecipes] ADD [Notes]  NVARCHAR (2048) NULL;", DB)
+					Command.Transaction = Transaction
+					Command.ExecuteNonQuery()
+
+					' Commit the changes.
+
+					Transaction.Commit()
+
+					' Mark as upgraded to 1.06.
+
+					If UpdateSuccessful Then PutControlItem("DBVersion", ProgramName & " Ver. 1.06")
+				End If
+
+				' If the database version is less than 1.07, change the servings field to allow nulls.
+
+				If Val(v1) < 1.07 Then
+
+					' Create the new images table
+
+					Transaction = DB.BeginTransaction
+					Command = New SqlCommand("ALTER TABLE [dbo].[tblRecipes]ALTER COLUMN [Servings] NVARCHAR (8) Not NULL", DB)
+					Command.Transaction = Transaction
+					Command.ExecuteNonQuery()
+
+					' Commit the changes.
+
+					Transaction.Commit()
+
+					' Mark as upgraded to 1.07.
+
+					If UpdateSuccessful Then PutControlItem("DBVersion", ProgramName & " Ver. 1.07")
+				End If
+
+				' If the database version is less than 1.08, then change the height and width fields
+				' to be REAL instead of INT.
+
+				If Val(v1) < 1.08 Then
+
+
+					' Create the new images table
+
+					Transaction = DB.BeginTransaction
+					Command = New SqlCommand("ALTER TABLE [dbo].[tblRecipes] DROP CONSTRAINT DF__tblRecipe__CardW__1A14E395; ALTER TABLE [dbo].[tblRecipes] DROP CONSTRAINT DF__tblRecipe__CardH__1B0907CE; ALTER TABLE [dbo].[tblRecipes] ALTER COLUMN [CardWidth] REAL NOT NULL; ALTER TABLE [dbo].[tblRecipes] ALTER COLUMN [CardHeight] REAL NOT NULL", DB)
+					Command.Transaction = Transaction
+					Command.ExecuteNonQuery()
+
+					' Commit the changes.
+
+					Transaction.Commit()
+
+					' Mark as upgraded to 1.08.
+
+					If UpdateSuccessful Then PutControlItem("DBVersion", ProgramName & " Ver. 1.08")
+				End If
+			Catch ex As Exception
+				Transaction.Rollback()
+				UpdateSuccessful = False
+				MsgBox("Upgrade database failed." & vbCrLf & ex.Message, MsgBoxStyle.Exclamation, "Database Version Upgrade")
+			End Try
+
+			' Update the database version if the update succeeded.
+
+
+			If UpdateSuccessful Then
+				PutControlItem("DBVersion", ProgramName & " Ver. " & DBVersion)
+				DatabaseChanged = True
+			End If
+		End If
+
+		' Clear upgrade message
+
+		frmMain.StatusLabel.Text = ""
+		My.Application.DoEvents()
+
+	End Function
+	'*******************************************************************
+
+	' Function to return the name of the a file without the path.
+
+	'*******************************************************************
+	Public Function FileNameNoPath(d As String) As String
+
+		' Declare variables
+
+		Dim jj As Integer
+		Dim zx As String = ""
+
+		' Peel off the path information and return just the database name.
+
+		For jj = d.Length - 1 To 0 Step -1
+			If d.Substring(jj, 1) = "\" Then
+				zx = d.Substring(jj + 1)
+				Return zx
+			End If
+		Next jj
+
+		Return d
+
+	End Function
+	'*******************************************************************
+
+	' Function to return the name of the current database without
+	' the path.
+
+	'*******************************************************************
+	Public Function DatabaseNameNoPath() As String
+		Return FileNameNoPath(Databasename)
+	End Function
+	'**************************************************
+
+	' Function to find a row in a datatable.
+	' Only one criteria may be specified.
+	' Input :  Table    = Datatable
+	'          Criteria = The criteria to be met.
+	' Output:  The index of the first record to meet
+	'          the criteria.
+
+	'**************************************************
+	Public Function Find(Table As DataTable, Criteria As String, Optional IgnoreBlanks As Boolean = False)
+
+		' Declare variables
+
+		Dim jj As Integer
+		Dim FoundID As Integer
+		Dim FoundRows() As DataRow
+
+		' Get all the records that match the specified criteria.
+
+		Try
+			FoundRows = Table.Select(Criteria)
+
+			' If no rows were found, return NOMATCH.
+
+			If FoundRows.Count = 0 Then
+				Return NOMATCH
+			Else
+
+				' Get the ID of the first found record.
+
+				FoundID = FoundRows(0)("ID")
+
+				' Now loop through the table to find the row number of the record with that ID.
+				' Return that row number.
+
+				For jj = 0 To Table.Rows.Count - 1
+					If Table.Rows(jj)("ID") = FoundID Then
+						Return jj
+					End If
+				Next jj
+
+			End If
+
+		Catch ex As Exception
+		End Try
+
+		' We should, ideally, never reach this.
+
+		Return NOMATCH
+
+
+	End Function
+	'**************************************************
+
+	' Function to find a row in a datatable.  This version
+	' uses a binary search for speed, but finds ONLY
+	' an equals condition.  The table must be sorted
+	' by the search column.
+	' Input :  Table    = Datatable
+	'          Compare = The value to search for.
+	' Output:  The index of the first record that equals
+	'          the searched-for value.
+
+	'**************************************************
+	Public Function Find2(Table As DataTable, Criteria As String, Optional IgnoreBlanks As Boolean = True)
+
+		' Declare variables
+
+		Dim ii As Integer
+		Dim jj As Integer
+		Dim Top As Integer
+		Dim Bottom As Integer
+		Dim Midl As Integer
+		Dim FieldToSearch As String = ""
+		Dim xx As String = ""
+		Dim zx As String = ""
+		Dim Compare As String = ""
+		Dim CompareValue As Object = Nothing
+
+		' Begin parsing the string
+
+		For jj = 1 To Criteria.Length
+
+			' Once we encounter a comparison string, the field to search is the value before that position.
+
+			zx = Criteria.Substring(jj - 1, 1)
+			If zx = "=" Or zx = "<" Or zx = ">" And FieldToSearch = "" Then
+				FieldToSearch = Criteria.Substring(0, jj - 1).Trim
+
+				' Now look for the comparison operator and extract
+				' the searched-for value that follows it.
+
+				xx = Criteria.Substring(jj - 1, 2)
+				If xx <> "<>" And xx <> "<=" And xx <> ">=" Then
+					xx = Criteria.Substring(jj - 1, 1)
+					Compare = Criteria.Substring(jj + 1 - 1)
+				Else
+					Compare = Criteria.Substring(jj + 2 - 1)
+				End If
+
+				Exit For
+			End If
+		Next jj
+
+		' Now convert the comparison value to a string or a value.
+
+		If Compare.Substring(0, 1) = "'" Then
+			CompareValue = LCase(SRep(Compare, 1, "'", ""))
+			If IgnoreBlanks Then CompareValue = CompareValue.Trim
+		Else
+			CompareValue = Val(Compare)
+		End If
+
+		' Begin searching the data table. If any errors occur, return a NOMATCH.
+
+		Try
+			Bottom = 1
+			Top = Table.Rows.Count
+			Midl = Int(Bottom + (Top - Bottom) / 2 + 0.1)
+			Do
+				xx = LCase(GetR(Table.Rows(Midl - 1), FieldToSearch)) ' Lower case everything for a case-insensitive search
+				If IgnoreBlanks Then xx = xx.Trim
+				If CompareValue = xx Then
+					Return Midl - 1
+				ElseIf CompareValue > xx Then
+					If Bottom >= Midl Then Return -1
+					Bottom = Midl
+					If Top - Midl > 1 Then ii = Int((Top - Midl) / 2) Else ii = 1
+					Midl += ii
+				ElseIf CompareValue < xx Then
+					If Top <= Midl Then Return -1
+					Top = Midl
+					If Midl - Bottom > 1 Then ii = Int((Midl - Bottom) / 2) Else ii = 1
+					Midl -= ii
+				End If
+			Loop While ii > 0 And Midl >= 1 And Midl <= Table.Rows.Count
+		Catch
+			Return -1 ' NOMATCH
+		End Try
+
+		' If we didn't find anything, return -1, also defined as the constant "NOMATCH"
+		' in the Global.vb module.
+
+		Return -1 ' NOMATCH
+
+	End Function
+	'
+	' Sub to save a control file item to the control file.
+	' Input:  Key   =  The item to be saved
+	'         Value = The value of the item saved
+	'
+	'**********************************************************
+	Public Sub PutControlItem(ByRef Key As String, ByRef Value As String)
+
+		' Declare variables
+
+		Dim xx As Integer
+		Dim dr As DataRow
+
+		' Look for the existing key in the control file
+
+		Try
+
+			xx = Find(ControlTable, "ItemName='" & Key & "'")
+
+			' If the key was not found, add a new entry.
+
+			If xx = NOMATCH Then
+				dr = ControlTable.NewRow
+				dr("ItemName") = Key.Substring(0, Math.Min(Key.Length, 20))
+				dr("Value") = Value
+				ControlTable.Rows.Add(dr)
+
+				'If the key was found, edit the record to add the new
+				'value, if one is supplied.
+
+			ElseIf Value <> "" Then
+				dr = ControlTable.Rows(xx)
+				dr("Value") = Value
+
+				'If the key is found, but there is no value supplied,
+				'delete the key
+
+			ElseIf Value = "" Then
+				dr = ControlTable.Rows(xx)
+				dr.Delete()
+
+			End If
+
+			' Update the record
+
+			ControlDA.Update(ControlTable)
+
+			' Trap for errors on an update
+
+		Catch ex As Exception
+			MsgBox("PutControlItem Failed." & vbCrLf & ex.Message, MsgBoxStyle.Critical, ProgramName)
+		End Try
+
+
+	End Sub
+	'**********************************************************
+	'
+	' Sub to get the text of an item from the control table,
+	' and return an optional default value if the
+	' item does not exist.
+	'
+	'**********************************************************
+	Public Function GetControlItem(ByRef ItemName As String, Optional ByRef DefaultValue As String = "") As String
+
+		' Declare variables
+
+		Dim xx As Integer
+		Dim zx0 As String
+
+		' Attempt to find the item name in the control table.
+		' If there is no database open, use the default value
+
+		xx = Find(ControlTable, "ItemName='" & ItemName & "'")
+		If xx = NOMATCH Then
+			zx0 = DefaultValue
+		Else
+			zx0 = GetR(ControlTable.Rows(xx), "Value")
+		End If
+
+		' Return the item value.
+
+		GetControlItem = zx0
+
+	End Function
+	'**************************************************
+	'
+	' Function to return a text version of the list
+	' of ingredients
+	' Input:   RecipeID = The ID of the recipe record.
+	' If a variable is passed in the Lines parameter,
+	' the number of ingredient lines will be returned.
+	' This allows determining  how many lines to print
+	' in each of the two columns of a recipe card.
+	'
+	'**************************************************
+	Public Function FormatIngredients(ByRef RecipeID As Integer, Optional ByRef Lines As Integer = 0) As String
+
+		' Declare variables
+
+		Dim ii As Integer
+		Dim LineCnt As Integer
+		Dim IngredientsDS As New DataSet
+		Dim lIngred As DataTable
+		Dim zx As String
+
+		' Create a dynaset of ingredients belonging to this
+		' recipe.
+
+		IngredientsDA.SelectCommand = IngredientsSelectCommand(RecipeID)
+		IngredientsDA.Fill(IngredientsDS, "Table")
+		lIngred = IngredientsDS.Tables("Table")
+
+		' Begin assembling the text
+
+		zx = ""
+		ii = 0
+		LineCnt = 0
+		If lIngred.Rows.Count > 0 Then
+			Do
+				If zx <> "" Then zx &= vbCrLf
+				If lIngred.Rows(ii)("Quantity") > 0 Then zx &= FormatFraction(lIngred.Rows(ii)("Quantity")) & " " & GetR(lIngred.Rows(ii), "UnitOfMeasure") & " "
+				zx &= GetR(lIngred.Rows(ii), "IngredientName")
+				ii += 1
+				LineCnt += 1
+			Loop While ii < lIngred.Rows.Count
+		End If
+		IngredientsDS.Dispose()
+
+		' Return the text
+
+		Lines = ii
+		Return zx
+
+	End Function
+
+	'**************************************************
+	'
+	' Function to format fractional amounts into their
+	' ordinal form (i.e. .125 = "1/8" or .25 = "¼"
+	' Input: Value     = The numeric value to format
+	'
+	'**************************************************
+	Public Function FormatFraction(ByRef Value As Single) As String
+
+		' Declare variables
+
+		Dim Ip As Single
+		Dim Fp As Single
+		Dim Rp1 As Integer
+		Dim Rp2 As Integer
+		Dim zx0 As String
+
+		' Determine the integer and fractional portions
+		' of the supplied value
+
+		Ip = Fix(Value)
+		Fp = Value - Ip
+
+		' Get the values for the fraction.  Any decimal
+		' value beyond those expressible as thirds or
+		' sixteenths are expressed decimally: eg: 1.456
+
+		Rp1 = 0 : Rp2 = 0
+		If Fp = 0.0625 Then Rp1 = 1 : Rp2 = 16
+		If Fp = 0.125 Then Rp1 = 1 : Rp2 = 8
+		If Fp > 0.299 And Fp <= 0.334 Then Rp1 = 1 : Rp2 = 3
+		If Fp = 0.1875 Then Rp1 = 3 : Rp2 = 16
+		If Fp = 0.25 Then Rp1 = 1 : Rp2 = 4
+		If Fp = 0.3125 Then Rp1 = 5 : Rp2 = 16
+		If Fp = 0.375 Then Rp1 = 3 : Rp2 = 8
+		If Fp = 0.4375 Then Rp1 = 7 : Rp2 = 16
+		If Fp = 0.5 Then Rp1 = 1 : Rp2 = 2
+		If Fp = 0.5625 Then Rp1 = 8 : Rp2 = 16
+		If Fp = 0.625 Then Rp1 = 5 : Rp2 = 8
+		If Fp > 0.64 And Fp <= 0.667 Then Rp1 = 2 : Rp2 = 3
+		If Fp = 0.6875 Then Rp1 = 11 : Rp2 = 16
+		If Fp = 0.75 Then Rp1 = 3 : Rp2 = 4
+		If Fp = 0.8125 Then Rp1 = 13 : Rp2 = 16
+		If Fp = 0.8755 Then Rp1 = 1 : Rp2 = 8
+		If Fp = 0.9375 Then Rp1 = 15 : Rp2 = 16
+
+		' Format the fraction.
+
+		If Ip > 0 Then zx0 = CStr(Ip) Else zx0 = ""
+		If Rp1 = 1 And Rp2 = 2 Then
+			zx0 &= "½"
+		ElseIf Rp1 = 1 And Rp2 = 4 Then
+			zx0 &= "¼"
+		ElseIf Rp1 = 1 And Rp2 = 3 Then
+			zx0 &= "⅓"
+		ElseIf Rp1 = 1 And Rp2 = 8 Then
+			zx0 &= "⅛"
+		ElseIf Rp1 = 2 And Rp2 = 3 Then
+			zx0 &= "⅔"
+		ElseIf Rp1 = 3 And Rp2 = 4 Then
+			zx0 &= "¾"
+		ElseIf Rp1 = 3 And Rp2 = 8 Then
+			zx0 &= "⅜"
+		ElseIf Rp1 = 5 And Rp2 = 8 Then
+			zx0 &= "⅝"
+		ElseIf Rp1 = 7 And Rp2 = 8 Then
+			zx0 &= "⅞"
+		ElseIf Rp1 > 0 Then
+			If Ip > 0 Then zx0 &= " "
+			zx0 &= CStr(Rp1) & "/" & CStr(Rp2)
+		Else
+			zx0 = CStr(Value)
+		End If
+
+		' Return the formated fraction
+
+		FormatFraction = zx0
+
+	End Function
+
+	'**************************************************
+	'
+	' Sub to save the ingredients, received in text
+	' format, to a recipe's attached records.
+	' Input: lRec = the data row of the recipe
+	'               for which the ingredients are 
+	'               to be saved.
+	'
+	'**************************************************
+	Public Sub SaveIngredients(ByRef lRec As DataRow, ByRef Txt As String)
+
+		' Declare variables
+
+		Dim wx As String
+		Dim zx As String
+		Dim Ing As strIngredient
+		Dim IngredientsDS As New DataSet
+		Dim dr As DataRow
+		Dim lIngred As DataTable
+
+		' First replace any abbreviations with a standard version
+		' of them.
+
+		Try
+			zx = StandardizeUnits(Txt)
+
+			' Anything larger than 3 consequtive spaces
+			' becomes a cr/lf
+
+			zx = SRep(zx, 1, "   ", vbCrLf)
+
+			' Create a dataset of the ingredients table
+
+			IngredientsDS.Clear()
+			IngredientsDA.Fill(IngredientsDS, "Table")
+			lIngred = IngredientsDS.Tables("Table")
+
+			' Begin parsing the text.
+
+			Do While zx <> ""
+				wx = ParseString(zx, vbCrLf)
+				Ing = ParseIngredientLine(wx)
+
+				' Write the ingredient record.
+
+				dr = lIngred.NewRow
+				dr("ParentID") = lRec("ID")
+				dr("Quantity") = Ing.Quantity
+				dr("UnitOfMeasure") = Ing.Unit
+				dr("IngredientName") = Ing.IngredientName
+				lIngred.Rows.Add(dr)
+				IngredientsDA.Update(IngredientsDS)
+
+			Loop
+		Catch ex As Exception
+			MsgBox("Failed to save ingredient list." & vbCrLf & ex.Message, MsgBoxStyle.Exclamation, "Save Igredients")
+		End Try
+
+	End Sub
+	'**************************************************
+
+	' Function to parse and ingredient line.
+
+	'**************************************************
+	Private Function ParseIngredientLine(line As String) As strIngredient
+
+		' Declare variables.
+
+		Dim result As New strIngredient
+		line = System.Text.RegularExpressions.Regex.Replace(line, "([\u00BC-\u00BE\u2150-\u215E])([a-zA-Z])", "$1 $2").Trim()
+
+		' Pattern handles:
+		'   - Whole + Unicode fraction (e.g., 3½)
+		'   - Whole + regular fraction (e.g., 3 1/2)
+		'   - Decimal (e.g., 2.25)
+		'   - Pure Unicode fraction (e.g., ½)
+		'   - Optional unit (like "cups") and ingredient name
+
+		Dim pattern As String = "^\s*(?:(\d+)\s*([\u00BC-\u00BE\u2150-\u215E])|(\d+)\s+(\d+)/(\d+)|(\d+(?:\.\d+)?|[\u00BC-\u00BE\u2150-\u215E])|(\d+)/(\d+))\s*([a-zA-Z\.]+)?\s+(.*)"
+		Dim match = System.Text.RegularExpressions.Regex.Match(line, pattern)
+
+		Dim whole As Single = 0F
+		Dim uniFrac As Single = 0F
+		Dim num As Single = 0F
+		Dim den As Single = 1.0F
+		Dim dec As Single = 0F
+		If match.Success Then
+			If match.Groups(1).Success Then
+				whole = Single.Parse(match.Groups(1).Value)
+				If match.Groups(2).Success Then
+					uniFrac = ConvertUnicodeFraction(match.Groups(2).Value(0))
+				End If
+			ElseIf match.Groups(3).Success And match.Groups(4).Success And match.Groups(5).Success Then
+				whole = Single.Parse(match.Groups(3).Value)
+				num = Single.Parse(match.Groups(4).Value)
+				den = Single.Parse(match.Groups(5).Value)
+			ElseIf match.Groups(6).Success Then
+				Dim raw = match.Groups(6).Value
+				If raw.Length = 1 Then
+					dec = ConvertUnicodeFraction(raw(0))
+					If dec = 0F Then dec = Val(raw(0))
+				Else
+					dec = Single.Parse(raw)
+				End If
+			ElseIf match.Groups(7).Success And match.Groups(8).Success Then
+				num = Single.Parse(match.Groups(7).Value)
+				den = Single.Parse(match.Groups(8).Value)
+			End If
+
+
+			result.Quantity = whole + uniFrac + If(den > 0, num / den, 0F) + dec
+			result.Unit = If(match.Groups(9).Success, match.Groups(9).Value.ToLower(), "")
+			result.IngredientName = match.Groups(10).Value.Trim()
+		Else
+			' Fallback: treat line as ingredient only
+			result.Quantity = 0F
+			result.Unit = ""
+			result.IngredientName = line
+		End If
+
+		Return result
+	End Function
+	'**************************************************
+
+	' Function to convert unicode fraction characters
+	' to their decimal equivalent.
+
+	'**************************************************
+	Private Function ConvertUnicodeFraction(fractionChar As Char) As Single
+		Select Case fractionChar
+			Case "½"c : Return 0.5F
+			Case "⅓"c : Return 0.333F
+			Case "⅔"c : Return 0.666F
+			Case "¼"c : Return 0.25F
+			Case "¾"c : Return 0.75F
+			Case "⅛"c : Return 0.125F
+			Case "⅜"c : Return 0.375F
+			Case "⅝"c : Return 0.625F
+			Case "⅞"c : Return 0.875F
+			Case Else : Return 0F
+		End Select
+	End Function
+	'**********************************************************
+	'
+	' Function to move all recipes from one book to another.
+	' Input: BookID = The ID of the book from which
+	'                 the recipes are to be moved.
+	' Output: True if move succeeded, False if not.
+	'
+	'**********************************************************
+	Public Function MoveRecipes(ByRef BookID As Integer) As Boolean
+
+		' Declare variables
+
+		Dim RecID As Integer
+		Dim RecipesDS As New DataSet
+		Dim lRec As DataTable
+		Dim l As New frmListBox
+		Dim Command As New SqlCommand
+
+		MoveRecipes = False ' Default return value unless we succeed with the move.
+
+		' Lookup all books except the one selected, for the user to select a destination book for recipes
+
+		RecID = l.Lookup(DB, "Move Recipes", "Move Recipes To", "Title,Category", "SELECT ID, Title,Category FROM tblCookbooks WHERE ID<>" & BookID & " ORDER BY Title", "ID", "", "Title", "Title|30,Category|12")
+
+		' If the user selected a book, try to move the recipes
+
+		Try
+			If RecID <> 0 Then
+
+				' Display count of records to be moved.
+
+				RecipesDA.SelectCommand = RecipesSelectCommand(BookID)
+				RecipesDA.Fill(RecipesDS, "Table")
+				lRec = RecipesDS.Tables("Table")
+				If lRec.Rows.Count > 0 Then
+					If MsgBox(lRec.Rows.Count & " Recipe(s) will be moved.", MsgBoxStyle.Information + MsgBoxStyle.OkCancel + MsgBoxStyle.DefaultButton1, "Move Recipes") = MsgBoxResult.Ok Then
+						Command.Connection = DB
+						Command.CommandText = "UPDATE tblRecipes SET ParentID=" & RecID & " WHERE ParentID=" & BookID
+						Command.CommandType = CommandType.Text
+						Command.ExecuteNonQuery()
+						MoveRecipes = True
+
+						' Flag that the database has changed
+
+						DatabaseChanged = True
+					End If
+				End If
+				RecipesDS.Dispose()
+			End If
+		Catch e As Exception
+			MsgBox(e.Message)
+		End Try
+
+
+	End Function
+	'**********************************************************
+	'
+	' Sub to move a single recipe from one book to another.
+	' Input:   RecipeID = The ID of the recipe to be moved.
+	' Output:  True if the move succeeded, False otherwise.
+	'
+	'**********************************************************
+	Public Function MoveRecipe(ByRef RecipeID As Integer) As Boolean
+
+		' Declare variables
+
+		Dim NewBookID As Integer
+		Dim RecipesDS As New DataSet
+		Dim lRec As DataTable
+		Dim l As New frmListBox
+		Dim Command As New SqlCommand
+		Dim Transaction As SqlTransaction
+
+		MoveRecipe = False ' Default return value unless we succeed with the move.
+
+		' Get the recipe to be moved
+
+		RecipesDA.SelectCommand.CommandText = "SELECT * FROM tblRecipes WHERE ID=" & RecipeID
+		RecipesDA.Fill(RecipesDS, "Table")
+		lRec = RecipesDS.Tables("Table")
+		If lRec.Rows.Count > 0 Then
+
+			' Lookup all books except the one selected, for the user to select a destination book for recipes
+
+			NewBookID = l.Lookup(DB, "Move Recipes", "Move Recipes To", "Title,Category", "SELECT ID, Title, Category FROM tblCookbooks WHERE ID<>" & lRec.Rows(0)("ParentID") & " ORDER BY Title", "ID", "", "Title", "Title|30,Category|12")
+
+			' If the user selected a book, try to move the recipes
+
+			If NewBookID <> 0 Then
+
+				' Begin a transaction
+
+				Transaction = DB.BeginTransaction
+
+				Try
+
+					' Fill the command parameters and execute the update command.
+
+					Command.Connection = DB
+					Command.Transaction = Transaction
+					Command.CommandText = "UPDATE tblRecipes SET ParentID=" & NewBookID & " WHERE ID=" & RecipeID
+					Command.CommandType = CommandType.Text
+					Command.ExecuteNonQuery()
+					MoveRecipe = True
+
+					' Commit the transaction
+
+					Transaction.Commit()
+
+					' Flag that the database has changed
+
+					DatabaseChanged = True
+				Catch e As Exception
+					MsgBox("Move recipe failed." & vbCrLf & e.Message, MsgBoxStyle.Exclamation, "Move Recipe")
+					Transaction.Rollback()
+				End Try
+				Transaction.Dispose()
+			End If
+		End If
+
+		' Destroy objects we've created.
+
+		RecipesDS.Dispose()
+		Command.Dispose()
+
+	End Function
+	'*******************************************************************
+
+	' Function to check for other open users of SQL before shutting
+	' down for a backup.
+
+	'*******************************************************************
+	Public Function CheckForOtherUsers() As DialogResult
+
+		' Declare variables
+
+		Dim jj As Integer
+		Dim OpenCount As Integer = 0
+		Dim zx As String = ""
+		Dim DA As New SqlDataAdapter
+		Dim DS As New DataSet
+		Dim Command As New SqlCommand("sp_who", DB) ' Stored procedure to get other databases that are open
+
+		' Run the stored procedure.
+
+		DA.SelectCommand = Command
+		DA.Fill(DS, "Table")
+
+		' Begin looking at all the databases, and checking for those open not by the SQL engine itself,
+		' which will have no host name. 
+
+		For jj = 0 To DS.Tables("Table").Rows.Count - 1
+			If GetR(DS.Tables("Table").Rows(jj), "hostname") = My.Computer.Name Then
+
+				' When we find an open database, see if it belongs to this program and if not,
+				' count it.
+
+				If LCase(DS.Tables("Table").Rows(jj)("dbname")) <> Databasename.ToLower() And LCase(DS.Tables("Table").Rows(jj)("dbname")) <> "master" Then
+					OpenCount += 1
+					zx &= LCase(DS.Tables("Table").Rows(jj)("dbname")) & vbCrLf
+				End If
+			End If
+		Next jj
+
+		' If there are any other open databases, alert the user that backup can not proceed and
+		' return a cancel status.
+
+		If OpenCount > 0 Then
+			If MsgBox("The following databases are open in other programs.  These should be closed before Backup can proceed.  You may proceed with the backup, but doing so could cause errors in the programs that rely on these databases." & vbCrLf & vbCrLf & zx & vbCrLf & vbCrLf & "Do you want to proceed with this backup anyway?", MsgBoxStyle.Exclamation + MsgBoxStyle.OkCancel + MsgBoxStyle.DefaultButton2, "Database Open") = MsgBoxResult.Ok Then
+				Return DialogResult.OK
+			Else
+				Return DialogResult.Cancel
+			End If
+		Else
+			Return DialogResult.OK
+		End If
+
+	End Function
+	'*****************************************************************
+	'
+	' Function to encode a byte array into Base64 text.
+	'
+	'******************************************************************
+	Public Function EncodeBase64(Data() As Byte, Optional BreakAt As Integer = 60) As String
+
+		' declare variables
+
+
+		Dim ii As Integer
+		Dim jj As Integer
+		Dim Byte1 As Byte
+		Dim Byte2 As Byte
+		Dim Byte3 As Byte
+		Dim Byte4 As Byte
+		Dim xx As String
+		Dim zx As String
+
+		' Begin processing the data, 3 bytes at a time (24 bits), which we 
+		' will convert into 4 groups of 6 bits
+		zx = ""
+		For jj = 0 To Data.Length - 1 Step 3
+
+			Byte1 = (Data(jj) And &HFC) / 4 ' Get first six bits of first byte, and shift right two bits (/4)
+			Byte2 = (Data(jj) And &H3) * 16 ' Get last two bits of first byte, and shift left four bits (*16)
+
+			' If we have at least one more byte to process, continue.
+
+			If jj + 1 <= Data.Length - 1 Then
+				Byte2 += ((Data(jj + 1) And &HF0) / 16) ' Add the first four bits of the second byte, shifted right four bits (/16)
+				Byte3 = (Data(jj + 1) And &HF) * 4 ' Get the second four bites of the second byte, and shift left two bits (*4)
+			Else
+				Byte3 = 64
+			End If
+
+			' If we have a third byte to process, continue
+
+			If jj + 2 <= Data.Length - 1 Then
+				Byte3 += ((Data(jj + 2) And &HC0) / 64) ' Add the first two bits of the third byte, shifted right 6 bits (/64)
+				Byte4 = Data(jj + 2) And &H3F ' Get the last six bits of the third byte.
+			Else
+				Byte4 = 64
+			End If
+
+			' Perform the lookup of 6-bit values to characters which represent them,
+			' and assemble the output string.
+
+			For hh = 1 To 4
+				ii = Choose(hh, Byte1, Byte2, Byte3, Byte4)
+				zx &= Mid("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=", ii + 1, 1)
+			Next hh
+		Next jj
+
+		' Break the string into lines separated by CrLf characters, if a length is specified.
+
+		If BreakAt > 0 Then
+			ii = 0
+			xx = ""
+			For jj = 1 To zx.Length
+				ii += 1
+				xx &= zx.ElementAt(jj)
+				If ii = BreakAt Then
+					xx &= vbCrLf
+					ii = 0
+				End If
+			Next jj
+		End If
+
+		Return zx
+
+	End Function
+
+	'**************************************************
+
+	' Function to replace unprintable fraction characters
+
+	'**************************************************
+	Public Function ReplaceUnicode(ByVal zx As String, Optional Type As UnicodeSubstitute = UnicodeSubstitute.None) As String
+
+		' See what kind of substitution we are making for unicode fraction characters.
+
+		Select Case Type
+			Case UnicodeSubstitute.None
+				zx = SRep(zx, 1, "⅓", "1/3")
+				zx = SRep(zx, 1, "⅔", "2/3")
+				zx = SRep(zx, 1, "⅛", "1/8")
+				zx = SRep(zx, 1, "⅜", "3/8")
+				zx = SRep(zx, 1, "⅝", "5/8")
+				zx = SRep(zx, 1, "⅞", "7/8")
+			Case UnicodeSubstitute.RTF
+				zx = SRep(zx, 1, "⅓", "\U8531?")
+				zx = SRep(zx, 1, "⅔", "\U8532?")
+				zx = SRep(zx, 1, "⅛", "\U8539?")
+				zx = SRep(zx, 1, "⅜", "\U8540?")
+				zx = SRep(zx, 1, "⅝", "\U8541?")
+				zx = SRep(zx, 1, "⅞", "\U8542?")
+			Case UnicodeSubstitute.HTML
+				zx = SRep(zx, 1, "⅓", "&#8531;")
+				zx = SRep(zx, 1, "⅔", "&#8532;")
+				zx = SRep(zx, 1, "⅛", "&#8539;")
+				zx = SRep(zx, 1, "⅜", "&#8540;")
+				zx = SRep(zx, 1, "⅝", "&#8541;")
+				zx = SRep(zx, 1, "⅞", "&#8542;")
+		End Select
+
+		Return zx
+
+	End Function
+	'**************************************************
+
+	' Function to escape characters that cannot be used
+	' in the XML Exchange Format for recipes.
+
+	'**************************************************
+
+	Function EscapeXml(text As String) As String
+		If String.IsNullOrEmpty(text) Then Return ""
+		Return text.Replace("&", "&amp;") _
+			.Replace("<", "&lt;") _
+			.Replace(">", "&gt;") _
+			.Replace("""", "&quot;") _
+			.Replace("'", "&apos;")
+	End Function
+	'**************************************************
+
+	' Function to nescape characters that cannot be used
+	' in the XML Exchange Format for recipes.
+
+	'**************************************************
+	Function UnescapeXml(text As String) As String
+		If String.IsNullOrEmpty(text) Then Return ""
+		Return text.Replace("&lt;", "<") _
+			.Replace("&gt;", ">") _
+			.Replace("&quot;", """") _
+			.Replace("&apos;", "'") _
+			.Replace("&amp;", "&")
+	End Function
+	'**************************************************
+	'
+	' Sub to perform a restore of the database from a backup copy
+	'
+	'**************************************************
+	Public Function RestoreDatabase(ToPath As String, FromBackup As String) As Boolean
+
+		' Declare variables
+
+		Dim ToDB As String
+		Dim FromLogFile As String
+		Dim ToLogFile As String
+		Dim QuietBackup As Microsoft.VisualBasic.FileIO.UIOption
+
+		' Get the name of the destination database from the backup selected.
+
+		ToDB = AddDirSeparator(ToPath) & FromBackup.Substring(0, FromBackup.Length - 7) ' Strip off "SC" and day of week extension.
+
+		' Get the name of the log file from the destination database.
+
+		ToLogFile = SRep(ToDB, 1, ".mdf", "_log.ldf", CompareMethod.Text)
+
+		' Get the name of the backup log file.
+
+		FromLogFile = SRep(FromBackup, 1, ".mdf", "_log.ldf", CompareMethod.Text)
+
+		' Verify that the user wants to perform the restore now.
+
+		If MsgBox("Backup " & FromBackup & " Will be restored to " & ToDB.ToLower() & "." & vbCrLf & vbCrLf & "Would you like to perform this restore now?", MsgBoxStyle.Question + MsgBoxStyle.YesNo, "Restore Database") = MsgBoxResult.No Then Return False
+
+		' Stop the SQL server
+
+		frmMain.BackupRestoreStatus.Image = My.Resources.Backup
+		frmMain.BackupRestoreStatus.Text = "Stopping SQL Service"
+		My.Application.DoEvents()
+
+		Dim TempConnection As New SqlConnection("Data Source=" & ServerName & ";database='';integrated security=true")
+		TempConnection.Open()
+		Dim Command As New SqlCommand("SHUTDOWN;", TempConnection)
+		Command.ExecuteNonQuery()
+		Command.Dispose()
+
+		' Get the Quiet Backup option.
+
+		If GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "QuietBackup", "True") = "True" Then QuietBackup = Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs Else QuietBackup = FileIO.UIOption.AllDialogs
+
+
+		' Copy the selected backup database to the database file.
+
+		Try
+
+			frmMain.BackupRestoreStatus.Text = "Restoring " & ToDB
+			My.Application.DoEvents()
+			My.Computer.FileSystem.CopyFile(BackupPath & FromBackup, ToDB, QuietBackup)
+
+			' Copy the log file.
+
+			frmMain.BackupRestoreStatus.Text = "Restoring " & ToLogFile
+			My.Application.DoEvents()
+			My.Computer.FileSystem.CopyFile(BackupPath & FromLogFile, ToLogFile, QuietBackup)
+
+			' Indicate that the restore succeeded.
+
+			SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "Restore", "Completed")
+
+			Return True
+
+		Catch e As Exception
+			MsgBox("Restore Failed." & vbCrLf & e.Message, MsgBoxStyle.Exclamation, "Restore Database")
+
+			' Indicate that the restore failed.
+
+			SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "Restore", "Failed")
+			SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "Databases", "BackupRestoreError", e.Message)
+
+			Return False
+		End Try
+	End Function
+	'**************************************************
+	'
+	' Function to return the recipe formatted to send
+	' as an RTF-format file attachment.
+	'
+	'**************************************************
+	Public Function FormatRTF(mrec As DataRow) As String
+
+		' Declare variables
+
+		Dim ii As Integer
+		Dim jj As Integer
+		Dim Lines As Integer
+		Dim DisplayWidth As Single
+		Dim RTF As String
+		Dim zx As String
+		Dim wx As String = ""
+		Dim Ing(60) As String
+		Dim RTFPrelude As String
+		Dim g As Graphics = frmMain.CreateGraphics
+		Dim f As New Font("Arial", 10) ' We'll use this font for measurements
+		Dim Indent As Integer = g.MeasureString("X", f).Width
+
+		' Set the tables (color, tabs and font) for starting RTF text.
+
+		RTFPrelude = "{\rtf1\ansi\ansicpg1252\deff0\deftab720{\fonttbl{\f0\fswiss MS Sans Serif;}{\f1\froman\fcharset2 Symbol;}{\f2\fcharset0 Arial;}{\f3\froman Times New Roman;}}{\colortbl\red0\green0\blue0;red0\green0\blue255;\red0\green255\blue0;\red255\green0\blue0;\red255\green0\blue255;}\deflang1033\pard\plain\f2\fs20\tx4320 "
+
+		' Calculate the width of a six-inch "card" in pixels
+
+		DisplayWidth = 6 * g.DpiX ' Width inches of emailed recipe converted to logical units
+		RTF = ReplaceUnicode(FormatIngredients(mrec("ID"), Lines), UnicodeSubstitute.RTF)
+
+		' Break the ingredient list into separate lines.
+
+		ii = 0
+		While RTF <> "" And ii <= Lines / 2
+			zx = WordWrap(g, f, RTF, DisplayWidth / 2 - Indent)
+			ii += 1
+			Ing(ii) = zx
+		End While
+
+		' Assemble a list of the ingredients, adding enough tabs
+		' between the two columns to align the second column
+
+		zx = ""
+		For jj = 1 To ii
+			Ing(jj) &= "\tab "
+			If RTF <> "" Then Ing(jj) &= WordWrap(g, f, RTF, DisplayWidth / 2 - Indent)
+			zx &= EscapeForRTF(Ing(jj)) & "\par "
+		Next jj
+		RTF = zx
+
+		' Assemble the entire recipe now: RecipeName, author (if there
+		' is one) the now-formatted ingredient list and the
+		' procedure.
+
+		zx = "\b\qc " & EscapeForRTF(mrec("RecipeName")) & "\plain\f3\par "
+		If GetR(mrec, "Author") <> "" Then wx = "\i\qc " & mrec("Author") & "\i0\plain\f3\par "
+		If GetR(mrec, "Blurb") <> "" Then wx &= "\i\fs18\qc " & EscapeForRTF(mrec("Blurb")) & "\i0\fs20\plain\f3\par "
+		RTF = RTFPrelude & zx & wx & "\ql\par " & RTF & "\par "
+		wx = mrec("Procedure")
+		wx = wx.Replace(vbCrLf, "")
+		While wx <> ""
+			RTF &= EscapeForRTF(WordWrap(g, f, wx, DisplayWidth)) & "\par "
+		End While
+		RTF &= "\par "
+
+		' Add the optional notes.
+
+		If GetR(mrec, "Notes") <> "" Then
+			wx = mrec("Notes")
+			wx.Replace(vbCrLf, "")
+			RTF &= "\par " & "\b Notes:\b0\par "
+			While wx <> ""
+				RTF &= EscapeForRTF(WordWrap(g, f, wx, DisplayWidth)) & "\par "
+			End While
+			RTF &= "\par "
+
+		End If
+
+		' Add the "end of all text" closing space/brace
+
+		RTF &= " }"
+
+		' Delete objects we've created
+
+		g.Dispose()
+		f.Dispose()
+
+		Return RTF
+
+	End Function
+	'**************************************************
+
+	' Function to format a recipe in RTF format, designed
+	' for viewing on a smartphone.
+
+	'**************************************************
+	Public Function FormatRTFMobile(mrec As DataRow) As String
+
+
+		' Declare variables
+
+		Dim zx As String
+		Dim xx As String
+		Dim RTF As String
+
+
+		' Set up the header information
+		RTF = "{\rtf1\ansi\ansicpg1252\deff0" & vbCrLf
+		RTF &= "{\fonttbl {\f0\fswiss\fcharset0 Helvetica;}}" & vbCrLf
+		RTF &= "{\colortbl;\red0\green0\blue0;}" & vbCrLf
+		RTF &= "\viewkind4\uc1\pard\sa200\sl276\slmult1\f0\fs24" & vbCrLf
+
+		RTF &= "\b " & EscapeForRTF(GetR(mrec, "RecipeName")) & "\b0\par" & vbCrLf
+		RTF &= "\par" & vbCrLf
+		RTF &= "\b Category:\b0 " & GetR(mrec, "Category") & "\par" & vbCrLf
+		If GetR(mrec, "Author") <> "" Then RTF &= "\b Author:\b0 " & GetR(mrec, "Author") & "\par" & vbCrLf
+		If Val(GetR(mrec, "Servings")) > 0 Then RTF &= "\b Servings:\b0 " & GetR(mrec, "Servings") & "\par" & vbCrLf
+		RTF &= "\par" & vbCrLf
+		RTF &= "\b Ingredients:\b0\par" & vbCrLf
+		zx = FormatIngredients(mrec("ID"))
+		Do While zx <> ""
+			xx = ParseString(zx, vbCrLf)
+			RTF &= "{\listtext\tab}\bullet\tab " & EscapeForRTF(xx) & "\par" & vbCrLf
+		Loop
+		RTF &= "\par" & vbCrLf
+		RTF &= "\b Procedure:\b0\par" & vbCrLf
+		zx = GetR(mrec, "Procedure")
+		Do While zx <> ""
+			xx = ParseString(zx, vbCrLf)
+			RTF &= EscapeForRTF(xx) & "\par" & vbCrLf
+		Loop
+
+		If GetR(mrec, "Notes") <> "" Then
+			RTF &= "\par" & vbCrLf
+			RTF &= "\b Notes:\b0\par" & vbCrLf
+			zx = GetR(mrec, "Notes")
+			Do While zx <> ""
+				xx = ParseString(zx, vbCrLf)
+				RTF &= EscapeForRTF(xx) & "\par" & vbCrLf
+			Loop
+		End If
+		RTF &= "}" & vbCrLf
+
+		Return RTF
+	End Function
+	'**************************************************
+
+	' Function to return the recipe formatted to send
+	' as an HTML-format file attachment intended for
+	' smartphones.
+
+	'**************************************************
+	Public Function FormatHTMLMobile(mRec As DataRow) As String
+
+
+		' Declare variables
+
+		Dim zx0 As String
+		Dim zx1 As String
+		Dim HTML As String
+
+		' Define the initial HTML string
+
+		HTML = "<!DOCTYPE html>" & vbCrLf
+		HTML &= "<html lang = ""en"" >" & vbCrLf
+		HTML &= "<head>" & vbCrLf
+		HTML &= "<meta charset=""UTF-8"">" & vbCrLf
+		HTML &= "<title>" & EscapeForHTML(mRec("RecipeName")) & "</title>" & vbCrLf
+		HTML &= "<style>" & vbCrLf
+		HTML &= "body { font-family: sans-serif; padding: 1em; line-height: 1.5; max-width: 480px; margin: auto; }"
+		HTML &= "h1, h2 { font-size: 1.2em; margin-top: 1em; border-bottom: 1px solid #ccc; padding-bottom: 0.2em; }"
+		HTML &= "ul, ol { padding-left: 1.2em; }" & vbCrLf
+		HTML &= ".section { margin-bottom: 1.5em; }" & vbCrLf
+		HTML &= ".notes { font-style: italic; background: #f9f9f9; padding: 0.5em; border-left: 3px solid #ccc; }" & vbCrLf
+		HTML &= "</style>" & vbCrLf
+		HTML &= "</head>" & vbCrLf
+
+		' Assemble the RecipeName, author (if there
+		' is one) and blurb into the HTML string
+
+		HTML &= "<body>" & vbCrLf
+		HTML &= "<h1>" & EscapeForHTML(GetR(mRec, "RecipeName")) & "</h1>" & vbCrLf
+		HTML &= "<div Class=""section"">" & vbCrLf
+		HTML &= "<strong> Category : </strong>" & GetR(mRec, "Category") & "<br>" & vbCrLf
+		If GetR(mRec, "Author") <> "" Then HTML &= "<strong> Author : </strong>" & GetR(mRec, "Author") & "<br>" & vbCrLf
+		If GetR(mRec, "Blurb") <> "" Then HTML &= GetR(mRec, "Blurb") & "<br>" & vbCrLf
+		If Val(mRec("Servings")) > 0 Then HTML &= "<strong> Servings : </strong>" & mRec("Servings") & vbCrLf
+		HTML &= "</div>" & vbCrLf
+
+		' Get the text of the ingredients
+
+		zx0 = ReplaceUnicode(FormatIngredients(mRec("ID")), UnicodeSubstitute.HTML)
+
+		' Assemble a list of the ingredients
+
+		HTML &= "<div Class=""section"">" & vbCrLf
+		HTML &= "<h2> Ingredients</h2>" & vbCrLf
+		HTML &= "<ul>" & vbCrLf
+		Do While zx0 <> ""
+			zx1 = ParseString(zx0, vbCrLf)
+			HTML &= "<li>" & zx1 & "</li>" & vbCrLf
+		Loop
+		HTML &= "</ul>" & vbCrLf
+		HTML &= "</div>" & vbCrLf
+
+		' Add the procedure.
+
+		HTML &= "<div Class=""section"">" & vbCrLf
+		HTML &= "<h2>Procedure</h2>" & vbCrLf
+		HTML &= "<ol>" & vbCrLf
+		zx0 = EscapeForHTML(GetR(mRec, "Procedure")) & vbCrLf
+		Do While zx0 <> ""
+			zx1 = ParseString(zx0, vbCrLf)
+			HTML &= "<li>" & zx1 & "</li>" & vbCrLf
+		Loop
+		HTML &= "</ol>" & vbCrLf
+		HTML &= "</div>" & vbCrLf
+
+		' Add the notes, if any.
+
+		If GetR(mRec, "Notes") <> "" Then
+			HTML &= "< div Class=""section notes"">" & vbCrLf
+			HTML &= EscapeForHTML(GetR(mRec, "Notes")) & vbCrLf
+			HTML &= "</div>" & vbCrLf
+		End If
+
+		' Finish up.
+
+		HTML &= "</body>" & vbCrLf
+		HTML &= "</html>" & vbCrLf
+
+		' Return the formatted text.
+
+		Return HTML
+
+	End Function
+	'**************************************************
+
+	' Function to return the recipe formatted to send
+	' as an HTML-format file attachment.
+
+	'**************************************************
+	Public Function FormatHTML(mRec As DataRow, Optional IncludeImage As Boolean = False) As String
+
+
+		' Declare variables
+
+		Dim ii As Integer
+		Dim jj As Integer
+		Dim Lines As Integer
+		Dim DisplayWidth As Single
+		Dim zx0 As String
+		Dim zx1 As String
+		Dim Ing(60) As String
+		Dim sb As New System.Text.StringBuilder
+		Dim ImageData() As Byte
+		Dim RecImg As Image
+		Dim s As Size
+		Dim ms As MemoryStream
+		Dim ImagesDS As New DataSet
+		Dim ImagesTable As DataTable
+		Dim g As Graphics = frmMain.CreateGraphics
+		Dim f As New Font("Arial", 10) ' We'll use this font for measurements
+		Dim Indent As Integer = g.MeasureString("X", f).Width
+
+		' Define the initial HTML string
+
+		sb.Append("<!DOCTYPE html>" & vbCrLf)
+		sb.Append("<html>" & vbCrLf)
+		sb.Append("<meta charset=""ISO-8859-1"">")
+		sb.Append("<body style=""font-family:Arial, Helvetica, sans-serif"">" & vbCrLf)
+
+		' Assemble the RecipeName, author (if there
+		' is one) and blurb into the HTML string
+
+		sb.Append("<center><strong><big><big>" & EscapeForHTML(mRec("RecipeName")) & "</big></big></strong></center>" & vbCrLf)
+		If GetR(mRec, "Author") <> "" Then sb.Append("<center><em>" & mRec("Author") & "</em></center>" & vbCrLf)
+		If GetR(mRec, "Blurb") <> "" Then sb.Append("<center><em><small>" & EscapeForHTML(mRec("Blurb")) & "</small></em></center>" & vbCrLf)
+		sb.Append("<br><br>" & vbCrLf)
+
+		' Calculate the width of a piece of paper in pixels
+
+		DisplayWidth = 8.5 * g.DpiX ' Width inches of emailed recipe converted to logical units
+
+		' Get the text of the ingredients
+
+		zx0 = ReplaceUnicode(FormatIngredients(mRec("ID"), Lines), UnicodeSubstitute.HTML)
+
+		' Break the ingredient list into separate lines of
+		' half the width of the email with a 1/4" space
+		' between the two columns
+
+		ii = 0
+		While zx0 <> "" And ii <= Lines / 2
+			zx1 = WordWrap(g, f, zx0, DisplayWidth / 2 - Indent)
+			ii += 1
+			Ing(ii) = zx1
+		End While
+
+		' Assemble a list of the ingredients
+
+		sb.Append("<table width=""100%"" border=""0"">" & vbCrLf)
+		For jj = 1 To ii
+			sb.Append("   <tr>" & vbCrLf)
+			If Ing(jj) <> "" Then
+				sb.Append("      <td width=""50%"">" & Ing(jj) & "</td>" & vbCrLf)
+			End If
+			If zx0 <> "" Then sb.Append("      <td width=""50%"">" & WordWrap(g, f, zx0, DisplayWidth / 2 - Indent) & "</td>" & vbCrLf)
+			sb.Append("   </tr>" & vbCrLf)
+		Next jj
+		sb.Append("</table><p>" & vbCrLf)
+
+		' Add the procedure.
+
+		sb.Append("<table width=""100%"" border=""0"">" & vbCrLf)
+		zx0 = EscapeForHTML(mRec("Procedure"))
+		While zx0 <> ""
+			sb.Append("    <tr>" & vbCrLf)
+			sb.Append("      <td width=""50%"">" & WordWrap(g, f, zx0, DisplayWidth) & "</td>")
+			sb.Append("   </tr>" & vbCrLf)
+		End While
+		sb.Append("</table><p>" & vbCrLf)
+
+		' Add the notes, if any.
+
+		If GetR(mRec, "Notes") <> "" Then
+			sb.Append("<table width=""100%"" border=""0"">" & vbCrLf)
+			zx0 = EscapeForHTML(mRec("Notes"))
+			While zx0 <> ""
+				sb.Append("    <tr>" & vbCrLf)
+				sb.Append("      <td width=""50%"">" & WordWrap(g, f, zx0, DisplayWidth) & "</td>")
+				sb.Append("   </tr>" & vbCrLf)
+			End While
+			sb.Append("</table><p>" & vbCrLf)
+		End If
+
+		' If there is an image, and "add image" is selected, include it in the email
+
+		If IncludeImage Then
+
+			' See if there is an image for this recipe.
+
+			ImagesDA.SelectCommand = New SqlCommand("SELECT * FROM tblImages WHERE ParentID=" & mRec("ID"), DB)
+			ImagesDA.Fill(ImagesDS, "Table")
+			ImagesTable = ImagesDS.Tables("Table")
+			If ImagesTable.Rows.Count > 0 Then
+
+				' Get the image data and convert it to an image.
+
+				ImageData = ImagesTable.Rows(0)("DocumentImage") ' Can only be a single image, at row 0.
+				ms = New MemoryStream(ImageData)
+				RecImg = Image.FromStream(ms)
+				s = RecImg.Size
+
+				' Determine the image format.
+
+				zx1 = "jpg"
+				If RecImg.RawFormat.Equals(System.Drawing.Imaging.ImageFormat.Jpeg) Then zx1 = "jpeg"
+				If RecImg.RawFormat.Equals(System.Drawing.Imaging.ImageFormat.Tiff) Then zx1 = "tif"
+				If RecImg.RawFormat.Equals(System.Drawing.Imaging.ImageFormat.Png) Then zx1 = "png"
+				If RecImg.RawFormat.Equals(System.Drawing.Imaging.ImageFormat.Bmp) Then zx1 = "bmp"
+
+				' Resize large images.
+
+				If RecImg.Width * RecImg.Height * 4 > 1500000 Then ' Calculate size of image, 32-bit color.
+					s = GetResizedDimensions(RecImg)
+					Dim bitmp As New Bitmap(RecImg, s)
+					bitmp.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg)
+				End If
+
+				' Convert the image data to a Base64 string.
+
+				'zx0 = EncodeBase64(ImageData, 0) ' Could also use built-in Convert.ToBase64String
+				zx0 = Convert.ToBase64String(ms.ToArray, Base64FormattingOptions.None)
+				sb.Append("<center><img src=""data:image/jpeg;base64," & zx0 & """ width=""" & s.Width & """ height=""" & s.Height & """ alt=""Image included with this recipe"" title=""" & mRec("RecipeName") & """/>")
+			End If
+		End If
+
+		' Add the close of the html
+
+		sb.Append(vbCrLf)
+		sb.Append("</body>" & vbCrLf)
+		sb.Append("</html>" & vbCrLf)
+
+		' return the result
+
+		Return sb.ToString
+
+		' Delete objects we've created
+
+		g.Dispose()
+		f.Dispose()
+
+	End Function
+	'**************************************************
+	'
+	' Function to return the recipe formatted to send
+	' in an Exchange format
+	'
+	'**************************************************
+	Public Function FormatExchange(mRec As DataRow) As String
+
+		' Declare variables
+
+		Dim sb As New System.Text.StringBuilder
+		Dim wx As String
+		Dim zx As String
+
+		' Get the text of the ingredient list
+
+		zx = FormatIngredients(mRec("ID"))
+
+		' Assemble the header text
+
+
+		sb.Append("<!--*******************************************-->" & vbCrLf)
+		sb.Append("<!--   Note to users of SiriusCook: the following recipe-->" & vbCrLf)
+		sb.Append("<!--is presented in an ""Exchange Format"" which can be -->" & vbCrLf)
+		sb.Append("<!--copied into the Windows clipboard and pasted into a cookbook.-->" & vbCrLf)
+		sb.Append("<!--   Using your mouse, select all the text following, beginning-->" & vbCrLf)
+		sb.Append("<!--with the <recipe> line and continuing to the end of this file.-->" & vbCrLf)
+		sb.Append("<!--Then, select the ""Copy"" menu item of the ""Edit"" menu in your Email-->" & vbCrLf)
+		sb.Append("<!--window, or press Ctrl-Insert.  Then, in SiriusCook, open the cookbook into -->" & vbCrLf)
+		sb.Append("<!--which you wish to paste the recipe and select the ""Paste"" menu option -->" & vbCrLf)
+		sb.Append("<!--of the cookbook's ""Edit"" menu.-->" & vbCrLf)
+		sb.Append("<!--*******************************************-->" & vbCrLf & vbCrLf)
+		sb.Append("<recipe>" & vbCrLf)
+		sb.Append("<header>" & vbCrLf)
+
+		' Assemble the recipe header.
+
+		sb.Append("<recipename>" & GetR(mRec, "RecipeName") & "</recipename>" & vbCrLf)
+		sb.Append("<category>" & GetR(mRec, "Category") & "</category>" & vbCrLf)
+		sb.Append("<blurb>" & GetR(mRec, "Blurb") & "</blurb>" & vbCrLf)
+		sb.Append("<author>" & GetR(mRec, "Author") & "</author>" & vbCrLf)
+		sb.Append("</header>" & vbCrLf)
+
+		' Add the ingredients.
+
+		Do While zx <> ""
+			wx = ParseString(zx, vbCrLf)
+			sb.Append("<ingredient>" & wx & "</ingredient>" & vbCrLf)
+		Loop
+		sb.Append("<procedure>" & GetR(mRec, "Procedure") & "</procedure>" & vbCrLf)
+		If GetR(mRec, "Notes") <> "" Then sb.Append(vbCrLf & "<notes>" & GetR(mRec, "Notes") & "</notes>" & vbCrLf)
+		sb.Append("</recipe>" & vbCrLf)
+
+		' Return the formatted recipe.
+
+		Return sb.ToString
+
+	End Function
+	'**********************************************************
+
+	' Function to properly escape non-Ascii characters in an
+	' RTF file.
+
+	'**********************************************************
+	Function EscapeForRTF(input As String) As String
+
+		' Declare variables.
+
+		Dim rtfBuilder As New System.Text.StringBuilder()
+
+		' Now start checking each character.
+
+		For Each ch As Char In input
+			Dim code As Integer = AscW(ch)
+
+			' ASCII range: write directly
+			If code >= 32 AndAlso code <= 126 Then
+				rtfBuilder.Append(ch)
+
+				' Extended Latin: escape as \'hh using ANSI codepage
+			ElseIf code > 126 And code <= 255 Then
+				rtfBuilder.Append("\'" & Hex(code).ToLower())
+
+				' Unicode beyond ANSI—encode as \uN?
+			ElseIf code > 255 Then
+				rtfBuilder.Append("\u" & code & "?")
+			End If
+		Next ch
+
+		Return rtfBuilder.ToString()
+	End Function
+	'**********************************************************
+
+	' Function to properly escape non-Ascii characters in an
+	' HTML file.
+
+	'**********************************************************
+	Public Function EscapeForHTML(input As String, Optional useHexEntities As Boolean = True) As String
+
+		' Declare variables.
+
+		Dim htmBuilder As New System.Text.StringBuilder()
+
+		For Each ch As Char In input
+			Select Case ch
+				Case "<"c
+					htmBuilder.Append("&lt;")
+				Case ">"c
+					htmBuilder.Append("&gt;")
+				Case "&"c
+					htmBuilder.Append("&amp;")
+				Case """"c
+					htmBuilder.Append("&quot;")
+				Case "'"c
+					htmBuilder.Append("&#39;")
+				Case Else
+					If useHexEntities AndAlso AscW(ch) > 127 Then
+						htmBuilder.Append("&#x" & AscW(ch).ToString("X") & ";")
+					Else
+						htmBuilder.Append(ch)
+					End If
+			End Select
+		Next
+
+		Return htmBuilder.ToString()
+	End Function
+	'**********************************************************
+
+	' Function to determine the size for a sized-down image.
+
+	'**********************************************************
+	Public Function GetResizedDimensions(Img As Image) As Size
+
+		' Declare variables.
+
+		Dim MemRequired As Integer
+		Dim ImgWidth As Integer
+		Dim ImgHeight As Integer
+		Dim Scale As Single = 0.5
+
+		' Get the image size as is.
+
+		ImgWidth = Img.Width
+		ImgHeight = Img.Height
+
+		' Now begin to determine how much it has to be reduced to be <= 1.5mb in size.
+
+		Do
+			MemRequired = ImgWidth * ImgHeight * 4 ' Calculate size in bytes, 32-bit color
+			If MemRequired > 1500000 Then ' Maximum 1.5 mb in size
+				If Scale > 0.1 Then
+					Scale -= 0.1
+				ElseIf Scale > 0.1 Then
+					Scale -= 0.01
+				End If
+
+				If Scale > 0 Then
+					ImgWidth = Img.Width * Scale
+					ImgHeight = Img.Height * Scale
+				End If
+			End If
+		Loop While MemRequired > 1500000
+
+		' Return the new size.
+
+		Return New Size(ImgWidth, ImgHeight)
+
+	End Function
+
+	'**************************************************
+
+	' Function to verify that LocalDB is installed and
+	' of the minimum version.
+
+	'**************************************************
+	Public Function VerifyLocalDB2019OrHigher() As Boolean
+		Try
+			'--- Step 1: Ask LocalDB for info about MSSQLLocalDB ---
+			Dim psi As New ProcessStartInfo()
+			psi.FileName = "SqlLocalDB.exe"
+			psi.Arguments = "info MSSQLLocalDB"
+			psi.RedirectStandardOutput = True
+			psi.UseShellExecute = False
+			psi.CreateNoWindow = True
+
+			Dim p As Process = Process.Start(psi)
+			Dim output As String = p.StandardOutput.ReadToEnd()
+			p.WaitForExit()
+
+			If String.IsNullOrWhiteSpace(output) Then
+				MsgBox("SQL Server LocalDB (MSSQLLocalDB) is not installed. Please install LocalDB 2019 or later.", MsgBoxStyle.Information, "LocalDB Not Found")
+				Return False
+			End If
+
+			'--- Step 2: Extract the version line ---
+			Dim version As String = ""
+			For Each line As String In output.Split({Environment.NewLine}, StringSplitOptions.RemoveEmptyEntries)
+				If line.Trim().StartsWith("Version", StringComparison.OrdinalIgnoreCase) Then
+					Dim parts = line.Split(":"c)
+					If parts.Length = 2 Then
+						version = parts(1).Trim()
+					End If
+				End If
+			Next
+
+			If version = "" Then
+				MsgBox("Unable to determine LocalDB version. Please install LocalDB 2019 or later.", MsgBoxStyle.Information, "LocalDB Version Error")
+				Return False
+			End If
+
+			'--- Step 3: Parse major version number ---
+			Dim major As Integer = 0
+			Dim m = Regex.Match(version, "^(\d+)")
+			If m.Success Then
+				major = Integer.Parse(m.Groups(1).Value)
+			End If
+
+			'SQL Server 2019 = version 15.x
+			If major < 15 Then
+				MsgBox("Your LocalDB version is too old. This program requires SQL Server LocalDB 2019 or later." & vbCrLf & vbCrLf & "Installed version: " & version, MsgBoxStyle.Information, "LocalDB Too Old")
+				Return False
+			End If
+
+			'--- All good ---
+			Return True
+
+		Catch ex As Exception
+			MsgBox("Error verifying SQL Server LocalDB:" & vbCrLf & ex.Message, MsgBoxStyle.Information, "LocalDB Error")
+				Return False
+			End Try
+		End Function
+
+	'**************************************************
+	'
+	' Property to indicate if a database has changed.
+	'
+	'**************************************************
+	Public Property DatabaseChanged As Boolean
+		Get
+			DatabaseChanged = CBool(GetControlItem("DatabaseChanged", "False"))
+		End Get
+		Set(value As Boolean)
+
+			' Declare variables
+
+			Dim xx As Integer
+			Dim dr As DataRow
+
+			' We must change this value directly, since calling PutControlItem always sets the flag
+			' to true.
+
+			xx = Find(ControlTable, "ItemName='DatabaseChanged'")
+			If xx <> NOMATCH Then
+				ControlTable.Rows(xx)("Value") = CStr(value)
+			Else
+				dr = ControlTable.NewRow
+				dr("ItemName") = "DatabaseChanged"
+				dr("Value") = CStr(value)
+				ControlTable.Rows.Add(dr)
+			End If
+			ControlDA.Update(ControlTable)
+		End Set
+	End Property
+
+	'**************************************************
+	'
+	' Property to get or set the program color theme
+	'
+	'**************************************************
+	Public Property ProgramColorTheme(Optional Component As ThemeItem = ThemeItem.All) As String
+		Get
+
+			' Declare variables
+
+			Dim zx As String
+
+			' Get the theme string.
+
+			zx = GetSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "ProgramColorTheme", "ThemeStyle", "0x1111")
+
+			' Determine what portion of the theme to return.
+
+			Select Case Component
+				Case ThemeItem.All
+					ProgramColorTheme = zx
+				Case ThemeItem.MainWindow
+					ProgramColorTheme = zx.Substring(3 - 1, 1)
+				Case ThemeItem.BackgroundColorNumber
+					ProgramColorTheme = zx.Substring(4 - 1, 1)
+				Case ThemeItem.TextColorNumber
+					ProgramColorTheme = zx.Substring(5 - 1, 1)
+				Case ThemeItem.FontNumber
+					ProgramColorTheme = zx.Substring(6 - 1, 1)
+				Case Else
+					ProgramColorTheme = zx
+			End Select
+		End Get
+		Set(value As String)
+
+			' Declare variables.
+
+			Dim x1 As String
+			Dim x2 As String
+			Dim x3 As String
+			Dim x4 As String
+
+			' Extract the portions of the theme to test them.
+
+			x1 = value.Substring(3 - 1, 1)
+			x2 = value.Substring(4 - 1, 1)
+			x3 = value.Substring(5 - 1, 1)
+			x4 = value.Substring(6 - 1, 1)
+
+			' Now validate each value.
+
+			If (x1 < "1" Or x1 > "4") Or (x2 < "1" Or x2 > "3") Or (x3 < "1" Or x3 > "4") Or (x4 < "1" Or x4 > "2") Then
+
+				' We will use the windows message box to display errors, to prevent reentrancy 
+				' issues with the routine calling itself.
+
+				vb.MsgBox("Invalid theme value: """ & value & """.  Theme not saved.", MsgBoxStyle.Exclamation, "Save Theme Property")
+			Else
+
+				' Save the new theme. 
+
+				SaveSetting("Sirius" & SRep(ProgramName, 1, " ", ""), "ProgramColorTheme", "ThemeStyle", value)
+			End If
+		End Set
+	End Property
+End Module

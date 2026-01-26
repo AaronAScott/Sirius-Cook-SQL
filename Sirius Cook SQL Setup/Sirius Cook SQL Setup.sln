@@ -1,0 +1,23 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{6141683F-8A12-4E36-9623-2EB02B2C2303}") = "Sirius Cook SQL Setup", "Sirius Cook SQL Setup\Sirius Cook SQL Setup.isproj", "{98A3AD63-E5C3-4077-981D-52F4C3E5D2C4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		CD_ROM|Default = CD_ROM|Default
+		DVD-5|Default = DVD-5|Default
+		SingleImage|Default = SingleImage|Default
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{98A3AD63-E5C3-4077-981D-52F4C3E5D2C4}.CD_ROM|Default.ActiveCfg = CD_ROM
+		{98A3AD63-E5C3-4077-981D-52F4C3E5D2C4}.CD_ROM|Default.Build.0 = CD_ROM
+		{98A3AD63-E5C3-4077-981D-52F4C3E5D2C4}.DVD-5|Default.ActiveCfg = DVD-5
+		{98A3AD63-E5C3-4077-981D-52F4C3E5D2C4}.DVD-5|Default.Build.0 = DVD-5
+		{98A3AD63-E5C3-4077-981D-52F4C3E5D2C4}.SingleImage|Default.ActiveCfg = SingleImage
+		{98A3AD63-E5C3-4077-981D-52F4C3E5D2C4}.SingleImage|Default.Build.0 = SingleImage
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
