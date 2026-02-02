@@ -742,10 +742,12 @@ Friend Class frmRecipeCard
 			frmMain.PrintDocument1.PrinterSettings.DefaultPageSettings.PaperSize = ps
 		End If
 
-		' Same with landscape mode: we must set it in both places.
+		' Same with landscape mode and color modes: we must them it in both places.
 
 		frmMain.PrintDocument1.DefaultPageSettings.Landscape = chkLandscape.Checked
 		frmMain.PrintDocument1.PrinterSettings.DefaultPageSettings.Landscape = chkLandscape.Checked
+		frmMain.PrintDocument1.DefaultPageSettings.Color = chkColor.Checked
+		frmMain.PrintDocument1.PrinterSettings.DefaultPageSettings.Color = chkColor.Checked
 
 		' See if the user said to print.
 
@@ -871,6 +873,12 @@ Friend Class frmRecipeCard
 
 		Dim LineHeight As Single = g.MeasureString("X", fN).Height
 		INDENT = g.MeasureString("X", fN).Width
+
+		' The card height and width may be in hundredths or units (new and old way, respectively).
+		' Adjust them to units if necessary.
+
+		If mWidth > 100 Then mWidth /= 100
+		If mHeight > 100 Then mHeight /= 100
 
 		' Get the card size in pixels, based on the screen resolution.
 

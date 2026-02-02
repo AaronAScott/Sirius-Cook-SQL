@@ -3103,10 +3103,6 @@ Friend Class frmOpenBook
 
 				Transaction.Commit()
 
-				' Rebuild the dataset
-
-				toc.Refresh()
-
 				' Redisplay the table of contents.
 
 				mBookmarks = Nothing ' Destroy bookmarks so they will be recreated

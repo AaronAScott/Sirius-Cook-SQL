@@ -62,6 +62,7 @@
 		Me.chkLandscape = New System.Windows.Forms.CheckBox()
 		Me.Frame1 = New System.Windows.Forms.GroupBox()
 		Me.cmbCardSize = New System.Windows.Forms.ComboBox()
+		Me.chkColor = New System.Windows.Forms.CheckBox()
 		CType(Me.Image2, System.ComponentModel.ISupportInitialize).BeginInit()
 		Me.Frame2.SuspendLayout()
 		Me.Panel1.SuspendLayout()
@@ -379,7 +380,7 @@
 		'chkLandscape
 		'
 		Me.chkLandscape.AutoSize = True
-		Me.chkLandscape.Location = New System.Drawing.Point(7, 70)
+		Me.chkLandscape.Location = New System.Drawing.Point(7, 52)
 		Me.chkLandscape.Name = "chkLandscape"
 		Me.chkLandscape.Size = New System.Drawing.Size(135, 18)
 		Me.chkLandscape.TabIndex = 47
@@ -389,6 +390,7 @@
 		'Frame1
 		'
 		Me.Frame1.BackColor = System.Drawing.SystemColors.Control
+		Me.Frame1.Controls.Add(Me.chkColor)
 		Me.Frame1.Controls.Add(Me.chkLandscape)
 		Me.Frame1.Controls.Add(Me.cmbCardSize)
 		Me.Frame1.Font = New System.Drawing.Font("Arial", 8.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
@@ -409,6 +411,16 @@
 		Me.cmbCardSize.Name = "cmbCardSize"
 		Me.cmbCardSize.Size = New System.Drawing.Size(158, 22)
 		Me.cmbCardSize.TabIndex = 0
+		'
+		'chkColor
+		'
+		Me.chkColor.AutoSize = True
+		Me.chkColor.Location = New System.Drawing.Point(7, 70)
+		Me.chkColor.Name = "chkColor"
+		Me.chkColor.Size = New System.Drawing.Size(51, 18)
+		Me.chkColor.TabIndex = 48
+		Me.chkColor.Text = "&Color"
+		Me.chkColor.UseVisualStyleBackColor = True
 		'
 		'frmRecipeCard
 		'
@@ -470,5 +482,6 @@
 	Friend WithEvents chkLandscape As CheckBox
 	Public WithEvents Frame1 As GroupBox
 	Friend WithEvents cmbCardSize As ComboBox
+	Friend WithEvents chkColor As CheckBox
 #End Region
 End Class
