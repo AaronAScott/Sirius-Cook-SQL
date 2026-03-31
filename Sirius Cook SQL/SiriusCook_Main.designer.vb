@@ -50,16 +50,13 @@
     Public WithEvents CookbookMenu As System.Windows.Forms.ToolStripMenuItem
     Public WithEvents mnuBackupDatabase As System.Windows.Forms.ToolStripMenuItem
     Public WithEvents UtilMenu As System.Windows.Forms.ToolStripMenuItem
-    Public WithEvents mnuGettingStarted As System.Windows.Forms.ToolStripMenuItem
-    Public WithEvents mnuHelpContents As System.Windows.Forms.ToolStripMenuItem
-    Public WithEvents HelpMenuSep1 As System.Windows.Forms.ToolStripSeparator
-    Public WithEvents AboutCook As System.Windows.Forms.ToolStripMenuItem
-    Public WithEvents HelpMenu As System.Windows.Forms.ToolStripMenuItem
-    Public WithEvents MainMenu1 As System.Windows.Forms.MenuStrip
-    'NOTE: The following procedure is required by the Windows Form Designer
-    'It can be modified using the Windows Form Designer.
-    'Do not modify it using the code editor.
-    <System.Diagnostics.DebuggerStepThrough()> Private Sub InitializeComponent()
+	Public WithEvents mnuAbout As System.Windows.Forms.ToolStripMenuItem
+	Public WithEvents HelpMenu As System.Windows.Forms.ToolStripMenuItem
+	Public WithEvents MainMenu1 As System.Windows.Forms.MenuStrip
+	'NOTE: The following procedure is required by the Windows Form Designer
+	'It can be modified using the Windows Form Designer.
+	'Do not modify it using the code editor.
+	<System.Diagnostics.DebuggerStepThrough()> Private Sub InitializeComponent()
 		Me.components = New System.ComponentModel.Container()
 		Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(frmMain))
 		Me.ToolTip1 = New System.Windows.Forms.ToolTip(Me.components)
@@ -98,6 +95,8 @@
 		Me.UtilMenu = New System.Windows.Forms.ToolStripMenuItem()
 		Me.mnuBackupDatabase = New System.Windows.Forms.ToolStripMenuItem()
 		Me.mnuRestoreDatabase = New System.Windows.Forms.ToolStripMenuItem()
+		Me.mnuCompactDatabase = New System.Windows.Forms.ToolStripMenuItem()
+		Me.ToolStripMenuItem2 = New System.Windows.Forms.ToolStripSeparator()
 		Me.mnuSetWSID = New System.Windows.Forms.ToolStripMenuItem()
 		Me.mnuOrganizeDB = New System.Windows.Forms.ToolStripMenuItem()
 		Me.mnuControlTableEditor = New System.Windows.Forms.ToolStripMenuItem()
@@ -105,10 +104,9 @@
 		Me.mnuTheme = New System.Windows.Forms.ToolStripMenuItem()
 		Me.mnuMaintainLinks = New System.Windows.Forms.ToolStripMenuItem()
 		Me.HelpMenu = New System.Windows.Forms.ToolStripMenuItem()
-		Me.mnuGettingStarted = New System.Windows.Forms.ToolStripMenuItem()
-		Me.mnuHelpContents = New System.Windows.Forms.ToolStripMenuItem()
-		Me.HelpMenuSep1 = New System.Windows.Forms.ToolStripSeparator()
-		Me.AboutCook = New System.Windows.Forms.ToolStripMenuItem()
+		Me.mnuAbout = New System.Windows.Forms.ToolStripMenuItem()
+		Me.mnuViewReadMe = New System.Windows.Forms.ToolStripMenuItem()
+		Me.mnuViewLicense = New System.Windows.Forms.ToolStripMenuItem()
 		Me.ToolStrip1 = New System.Windows.Forms.ToolStrip()
 		Me.StatusLabel = New System.Windows.Forms.ToolStripLabel()
 		Me.ToolStripLabel1 = New System.Windows.Forms.ToolStripLabel()
@@ -129,8 +127,6 @@
 		Me.PrintDocument1 = New System.Drawing.Printing.PrintDocument()
 		Me.PrintPreviewDialog1 = New System.Windows.Forms.PrintPreviewDialog()
 		Me.timBackupStatus = New System.Windows.Forms.Timer(Me.components)
-		Me.mnuCompactDatabase = New System.Windows.Forms.ToolStripMenuItem()
-		Me.ToolStripMenuItem2 = New System.Windows.Forms.ToolStripSeparator()
 		Me.picBookshelf_0.SuspendLayout()
 		CType(Me.Image1, System.ComponentModel.ISupportInitialize).BeginInit()
 		Me.MainMenu1.SuspendLayout()
@@ -387,6 +383,18 @@
 		Me.mnuRestoreDatabase.Size = New System.Drawing.Size(213, 22)
 		Me.mnuRestoreDatabase.Text = "&Restore Database..."
 		'
+		'mnuCompactDatabase
+		'
+		Me.mnuCompactDatabase.Enabled = False
+		Me.mnuCompactDatabase.Name = "mnuCompactDatabase"
+		Me.mnuCompactDatabase.Size = New System.Drawing.Size(213, 22)
+		Me.mnuCompactDatabase.Text = "&Compact Database"
+		'
+		'ToolStripMenuItem2
+		'
+		Me.ToolStripMenuItem2.Name = "ToolStripMenuItem2"
+		Me.ToolStripMenuItem2.Size = New System.Drawing.Size(210, 6)
+		'
 		'mnuSetWSID
 		'
 		Me.mnuSetWSID.Name = "mnuSetWSID"
@@ -427,33 +435,28 @@
 		'
 		'HelpMenu
 		'
-		Me.HelpMenu.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuGettingStarted, Me.mnuHelpContents, Me.HelpMenuSep1, Me.AboutCook})
+		Me.HelpMenu.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuAbout, Me.mnuViewReadMe, Me.mnuViewLicense})
 		Me.HelpMenu.Name = "HelpMenu"
 		Me.HelpMenu.Size = New System.Drawing.Size(44, 20)
 		Me.HelpMenu.Text = "&Help"
 		'
-		'mnuGettingStarted
+		'mnuAbout
 		'
-		Me.mnuGettingStarted.Name = "mnuGettingStarted"
-		Me.mnuGettingStarted.Size = New System.Drawing.Size(166, 22)
-		Me.mnuGettingStarted.Text = "&GettingStarted"
+		Me.mnuAbout.Name = "mnuAbout"
+		Me.mnuAbout.Size = New System.Drawing.Size(180, 22)
+		Me.mnuAbout.Text = "About SiriusCook"
 		'
-		'mnuHelpContents
+		'mnuViewReadMe
 		'
-		Me.mnuHelpContents.Name = "mnuHelpContents"
-		Me.mnuHelpContents.Size = New System.Drawing.Size(166, 22)
-		Me.mnuHelpContents.Text = "&Contents"
+		Me.mnuViewReadMe.Name = "mnuViewReadMe"
+		Me.mnuViewReadMe.Size = New System.Drawing.Size(180, 22)
+		Me.mnuViewReadMe.Text = "View &ReadMe"
 		'
-		'HelpMenuSep1
+		'mnuViewLicense
 		'
-		Me.HelpMenuSep1.Name = "HelpMenuSep1"
-		Me.HelpMenuSep1.Size = New System.Drawing.Size(163, 6)
-		'
-		'AboutCook
-		'
-		Me.AboutCook.Name = "AboutCook"
-		Me.AboutCook.Size = New System.Drawing.Size(166, 22)
-		Me.AboutCook.Text = "About SiriusCook"
+		Me.mnuViewLicense.Name = "mnuViewLicense"
+		Me.mnuViewLicense.Size = New System.Drawing.Size(180, 22)
+		Me.mnuViewLicense.Text = "View &License"
 		'
 		'ToolStrip1
 		'
@@ -622,18 +625,6 @@
 		'
 		Me.timBackupStatus.Interval = 30000
 		'
-		'mnuCompactDatabase
-		'
-		Me.mnuCompactDatabase.Enabled = False
-		Me.mnuCompactDatabase.Name = "mnuCompactDatabase"
-		Me.mnuCompactDatabase.Size = New System.Drawing.Size(213, 22)
-		Me.mnuCompactDatabase.Text = "&Compact Database"
-		'
-		'ToolStripMenuItem2
-		'
-		Me.ToolStripMenuItem2.Name = "ToolStripMenuItem2"
-		Me.ToolStripMenuItem2.Size = New System.Drawing.Size(210, 6)
-		'
 		'frmMain
 		'
 		Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 14.0!)
@@ -666,35 +657,37 @@
 
 	End Sub
 	Friend WithEvents ToolStrip1 As System.Windows.Forms.ToolStrip
-    Friend WithEvents StatusLabel As System.Windows.Forms.ToolStripLabel
-    Friend WithEvents ImageList2 As System.Windows.Forms.ImageList
-    Friend WithEvents ImageList3 As System.Windows.Forms.ImageList
-    Friend WithEvents OpenFileDialog1 As System.Windows.Forms.OpenFileDialog
-    Friend WithEvents FolderBrowserDialog1 As System.Windows.Forms.FolderBrowserDialog
-    Friend WithEvents ToolStripLabel1 As System.Windows.Forms.ToolStripLabel
-    Friend WithEvents UserLabel As System.Windows.Forms.ToolStripLabel
-    Friend WithEvents mnuControlTableEditor As System.Windows.Forms.ToolStripMenuItem
-    Friend WithEvents mnuSetWSID As System.Windows.Forms.ToolStripMenuItem
-    Friend WithEvents mnuRestoreDatabase As System.Windows.Forms.ToolStripMenuItem
-    Friend WithEvents mnuContextMenu1 As System.Windows.Forms.ContextMenuStrip
-    Friend WithEvents mnuPOPOpenBook As System.Windows.Forms.ToolStripMenuItem
-    Friend WithEvents mnuPOPRemove As System.Windows.Forms.ToolStripMenuItem
-    Friend WithEvents mnuPOPProperties As System.Windows.Forms.ToolStripMenuItem
-    Friend WithEvents ToolStripSeparator1 As System.Windows.Forms.ToolStripSeparator
-    Friend WithEvents ToolStripSeparator2 As System.Windows.Forms.ToolStripSeparator
-    Friend WithEvents PrintDialog1 As System.Windows.Forms.PrintDialog
-    Friend WithEvents PrintDocument1 As System.Drawing.Printing.PrintDocument
-    Friend WithEvents PrintPreviewDialog1 As System.Windows.Forms.PrintPreviewDialog
-    Friend WithEvents mnuRestoreDefaults As System.Windows.Forms.ToolStripMenuItem
-    Friend WithEvents BackupRestoreStatus As System.Windows.Forms.ToolStripLabel
-    Friend WithEvents mnuOrganizeDB As System.Windows.Forms.ToolStripMenuItem
-    Friend WithEvents mnuTheme As System.Windows.Forms.ToolStripMenuItem
-    Friend WithEvents timBackupStatus As System.Windows.Forms.Timer
-    Friend WithEvents mnuRegistry As System.Windows.Forms.ToolStripMenuItem
+	Friend WithEvents StatusLabel As System.Windows.Forms.ToolStripLabel
+	Friend WithEvents ImageList2 As System.Windows.Forms.ImageList
+	Friend WithEvents ImageList3 As System.Windows.Forms.ImageList
+	Friend WithEvents OpenFileDialog1 As System.Windows.Forms.OpenFileDialog
+	Friend WithEvents FolderBrowserDialog1 As System.Windows.Forms.FolderBrowserDialog
+	Friend WithEvents ToolStripLabel1 As System.Windows.Forms.ToolStripLabel
+	Friend WithEvents UserLabel As System.Windows.Forms.ToolStripLabel
+	Friend WithEvents mnuControlTableEditor As System.Windows.Forms.ToolStripMenuItem
+	Friend WithEvents mnuSetWSID As System.Windows.Forms.ToolStripMenuItem
+	Friend WithEvents mnuRestoreDatabase As System.Windows.Forms.ToolStripMenuItem
+	Friend WithEvents mnuContextMenu1 As System.Windows.Forms.ContextMenuStrip
+	Friend WithEvents mnuPOPOpenBook As System.Windows.Forms.ToolStripMenuItem
+	Friend WithEvents mnuPOPRemove As System.Windows.Forms.ToolStripMenuItem
+	Friend WithEvents mnuPOPProperties As System.Windows.Forms.ToolStripMenuItem
+	Friend WithEvents ToolStripSeparator1 As System.Windows.Forms.ToolStripSeparator
+	Friend WithEvents ToolStripSeparator2 As System.Windows.Forms.ToolStripSeparator
+	Friend WithEvents PrintDialog1 As System.Windows.Forms.PrintDialog
+	Friend WithEvents PrintDocument1 As System.Drawing.Printing.PrintDocument
+	Friend WithEvents PrintPreviewDialog1 As System.Windows.Forms.PrintPreviewDialog
+	Friend WithEvents mnuRestoreDefaults As System.Windows.Forms.ToolStripMenuItem
+	Friend WithEvents BackupRestoreStatus As System.Windows.Forms.ToolStripLabel
+	Friend WithEvents mnuOrganizeDB As System.Windows.Forms.ToolStripMenuItem
+	Friend WithEvents mnuTheme As System.Windows.Forms.ToolStripMenuItem
+	Friend WithEvents timBackupStatus As System.Windows.Forms.Timer
+	Friend WithEvents mnuRegistry As System.Windows.Forms.ToolStripMenuItem
 	Friend WithEvents mnuMaintainLinks As System.Windows.Forms.ToolStripMenuItem
 	Friend WithEvents mnuRecent As System.Windows.Forms.ToolStripMenuItem
 	Friend WithEvents mnuFavorites As System.Windows.Forms.ToolStripMenuItem
 	Friend WithEvents mnuCompactDatabase As ToolStripMenuItem
 	Friend WithEvents ToolStripMenuItem2 As ToolStripSeparator
+	Friend WithEvents mnuViewReadMe As ToolStripMenuItem
+	Friend WithEvents mnuViewLicense As ToolStripMenuItem
 #End Region
 End Class

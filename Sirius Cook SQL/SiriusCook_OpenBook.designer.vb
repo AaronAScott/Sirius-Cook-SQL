@@ -489,63 +489,57 @@
 		Me.txtNotes.Prompt = "Add additional notes"
 		Me.txtNotes.Size = New System.Drawing.Size(314, 78)
 		Me.txtNotes.TabIndex = 8
-		Me.txtNotes.Text = "Add additional notes"
 		'
 		'txtServings
 		'
-		Me.txtServings.ForeColor = System.Drawing.Color.DarkGray
+		Me.txtServings.ForeColor = System.Drawing.SystemColors.WindowText
 		Me.txtServings.Location = New System.Drawing.Point(23, 134)
 		Me.txtServings.Name = "txtServings"
 		Me.txtServings.Prompt = "No. Servings"
 		Me.txtServings.Size = New System.Drawing.Size(72, 20)
 		Me.txtServings.TabIndex = 5
-		Me.txtServings.Text = "No. Servings"
 		'
 		'txtTitle
 		'
-		Me.txtTitle.ForeColor = System.Drawing.Color.DarkGray
+		Me.txtTitle.ForeColor = System.Drawing.SystemColors.WindowText
 		Me.txtTitle.Location = New System.Drawing.Point(23, 13)
 		Me.txtTitle.Name = "txtTitle"
 		Me.txtTitle.Prompt = "Recipe Title"
 		Me.txtTitle.Size = New System.Drawing.Size(301, 20)
 		Me.txtTitle.TabIndex = 1
-		Me.txtTitle.Text = "Recipe Title"
 		'
 		'txtCategory
 		'
 		Me.txtCategory.AutoCompleteMode = System.Windows.Forms.AutoCompleteMode.SuggestAppend
-		Me.txtCategory.ForeColor = System.Drawing.Color.DarkGray
+		Me.txtCategory.ForeColor = System.Drawing.SystemColors.WindowText
 		Me.txtCategory.Location = New System.Drawing.Point(23, 35)
 		Me.txtCategory.Name = "txtCategory"
 		Me.txtCategory.Prompt = "Recipe Category"
 		Me.txtCategory.Size = New System.Drawing.Size(173, 20)
 		Me.txtCategory.TabIndex = 2
-		Me.txtCategory.Text = "Recipe Category"
 		'
 		'txtAuthor
 		'
-		Me.txtAuthor.ForeColor = System.Drawing.Color.DarkGray
+		Me.txtAuthor.ForeColor = System.Drawing.SystemColors.WindowText
 		Me.txtAuthor.Location = New System.Drawing.Point(23, 57)
 		Me.txtAuthor.Name = "txtAuthor"
 		Me.txtAuthor.Prompt = "Author's Name or Recipe Source"
 		Me.txtAuthor.Size = New System.Drawing.Size(173, 20)
 		Me.txtAuthor.TabIndex = 3
-		Me.txtAuthor.Text = "Author's Name or Recipe Source"
 		'
 		'txtBlurb
 		'
-		Me.txtBlurb.ForeColor = System.Drawing.Color.DarkGray
+		Me.txtBlurb.ForeColor = System.Drawing.SystemColors.WindowText
 		Me.txtBlurb.Location = New System.Drawing.Point(23, 79)
 		Me.txtBlurb.Multiline = True
 		Me.txtBlurb.Name = "txtBlurb"
 		Me.txtBlurb.Prompt = "Say something about this recipe"
 		Me.txtBlurb.Size = New System.Drawing.Size(301, 47)
 		Me.txtBlurb.TabIndex = 4
-		Me.txtBlurb.Text = "Say something about this recipe"
 		'
 		'txtIngredients
 		'
-		Me.txtIngredients.ForeColor = System.Drawing.Color.DarkGray
+		Me.txtIngredients.ForeColor = System.Drawing.SystemColors.WindowText
 		Me.txtIngredients.Location = New System.Drawing.Point(23, 166)
 		Me.txtIngredients.Multiline = True
 		Me.txtIngredients.Name = "txtIngredients"
@@ -553,11 +547,10 @@
 		Me.txtIngredients.ScrollBars = System.Windows.Forms.ScrollBars.Vertical
 		Me.txtIngredients.Size = New System.Drawing.Size(301, 295)
 		Me.txtIngredients.TabIndex = 6
-		Me.txtIngredients.Text = "List the ingredients for the recipe, pressing Enter between each ingredient"
 		'
 		'txtProcedure
 		'
-		Me.txtProcedure.ForeColor = System.Drawing.Color.DarkGray
+		Me.txtProcedure.ForeColor = System.Drawing.SystemColors.WindowText
 		Me.txtProcedure.Location = New System.Drawing.Point(447, 59)
 		Me.txtProcedure.Multiline = True
 		Me.txtProcedure.Name = "txtProcedure"
@@ -565,7 +558,6 @@
 		Me.txtProcedure.ScrollBars = System.Windows.Forms.ScrollBars.Vertical
 		Me.txtProcedure.Size = New System.Drawing.Size(314, 304)
 		Me.txtProcedure.TabIndex = 7
-		Me.txtProcedure.Text = "List the steps to making the recipe"
 		'
 		'btnCancel
 		'

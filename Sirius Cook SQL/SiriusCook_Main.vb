@@ -1,6 +1,7 @@
 Option Strict Off
 Option Explicit On
 Imports System.Data.SqlClient
+Imports System.IO
 Imports VB = Microsoft.VisualBasic
 
 Friend Class frmMain
@@ -45,9 +46,18 @@ Friend Class frmMain
 		ProgramName = "Sirius Cook SQL"
 		Version = CStr(My.Application.Info.Version.Major) & "." & CStr(My.Application.Info.Version.Minor) & CStr(My.Application.Info.Version.Build) & CStr(My.Application.Info.Version.MinorRevision)
 		DBVersion = "1.08"
-		Dependencies.Add(New Dependency("PromptedTextBox", "dll"), "PromptedTextBox")
-		Dependencies.Add(New Dependency("SiriusCookSQL", "file", "SiriusCook Master.mdf.template"), "SiriusCookSQL")
-		Dependencies.Add(New Dependency("SE_MailSender", "dll"), "SE_MailSender")
+		Dependencies.Add(New Dependency("PromptedTextBox", "dll", "PromptedTextBox"))
+		Dependencies.Add(New Dependency("SE_MailSender", "dll", "SE_MailSender"))
+		Dependencies.Add(New Dependency("SiriusCookSQL", "file", "SiriusCook Master.mdf.template"))
+		Dependencies.Add(New Dependency("SiriusCookSQL", "file", "Microsoft.Web.WebView2.Core.dll"))
+		Dependencies.Add(New Dependency("SiriusCookSQL", "file", "Microsoft.Web.WebView2.WinForms.dll"))
+		Dependencies.Add(New Dependency("SiriusCookSQL", "file", "Microsoft.Web.WebView2.Wpf.dll"))
+		Dependencies.Add(New Dependency("SiriusCookSQL", "file", "BouncyCastle.Cryptography.dll"))
+		Dependencies.Add(New Dependency("SiriusCookSQL", "file", "MailKit.dll"))
+		Dependencies.Add(New Dependency("SiriusCookSQL", "file", "MimeKit.dll"))
+		Dependencies.Add(New Dependency("SiriusCookSQL", "file", "Recipes.mdf"))
+		Dependencies.Add(New Dependency("SiriusCookSQL", "file", "README.md"))
+		Dependencies.Add(New Dependency("SiriusCookSQL", "file", "LICENSE.md"))
 
 		' Check for program updates first thing.
 
@@ -232,7 +242,7 @@ Friend Class frmMain
 	' The Help Contents menu option is selected.
 	'
 	'***************************************************************
-	Public Sub mnuHelpContents_Click(ByVal eventSender As System.Object, ByVal eventArgs As System.EventArgs) Handles mnuHelpContents.Click
+	Public Sub mnuHelpContents_Click(ByVal eventSender As System.Object, ByVal eventArgs As System.EventArgs)
 		Help.ShowHelpIndex(Me, ProgramPath & "Contents.htm")
 	End Sub
 	'***************************************************************
@@ -240,7 +250,7 @@ Friend Class frmMain
 	' The Getting Started help menu option is selected.
 	'
 	'***************************************************************
-	Public Sub mnuGettingStarted_Click(ByVal eventSender As System.Object, ByVal eventArgs As System.EventArgs) Handles mnuGettingStarted.Click
+	Public Sub mnuGettingStarted_Click(ByVal eventSender As System.Object, ByVal eventArgs As System.EventArgs)
 		Help.ShowHelpIndex(Me, ProgramPath & "Getting Started.htm")
 	End Sub
 	'**************************************************
@@ -248,9 +258,48 @@ Friend Class frmMain
 	' The "About" menu option is selected.
 	'
 	'**************************************************
-	Public Sub AboutCook_Click(ByVal eventSender As System.Object, ByVal eventArgs As System.EventArgs) Handles AboutCook.Click
+	Public Sub mnuAbout_Click(ByVal eventSender As System.Object, ByVal eventArgs As System.EventArgs) Handles mnuAbout.Click
 		About.ShowDialog()
 	End Sub
+	'***********************************************************************
+
+	' The View Readme menu option is selected.
+
+	'***********************************************************************
+	Private Sub mnuViewReadme_Click(sender As Object, e As EventArgs) Handles mnuViewReadMe.Click
+
+		' Create a viwer.  If the user sets the "EditMDFiles" value, using the Control Table Editor,
+		' to "True", they will be able to both view and edit .md files.
+
+		Dim f As New frmMDViewer
+		Dim zx As String = My.Application.Info.DirectoryPath & "\Readme.md"
+		f.LoadFile(zx)
+		f.Text = "Viewing " & Path.GetFileName(zx)
+
+		If DbOpen Then f.EnableEditing = CBool(GetControlItem("EditMDFiles", "False"))
+		f.ShowDialog()
+
+	End Sub
+	'***********************************************************************
+
+	' The View licenses menu option is selected.
+
+	'***********************************************************************
+	Private Sub mnuViewLicense_Click(sender As Object, e As EventArgs) Handles mnuViewLicense.Click
+
+		' Create a viwer.  If the user sets the "EditMDFiles" value, using the Control Table Editor,
+		' to "True", they will be able to both view and edit .md files.
+
+		Dim f As New frmMDViewer
+		Dim zx As String = My.Application.Info.DirectoryPath & "\license.md"
+		f.LoadFile(zx)
+		f.Text = "Viewing " & Path.GetFileName(zx)
+
+		f.EnableEditing = CBool(GetControlItem("EditMDFiles", "False"))
+		f.Show()
+
+	End Sub
+
 
 
 	'**************************************************

@@ -14,13 +14,6 @@
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
-    <SccProjectName>
-    </SccProjectName>
-    <SccLocalPath>
-    </SccLocalPath>
-    <SccAuxPath />
-    <SccProvider>
-    </SccProvider>
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
@@ -118,8 +111,8 @@
     <Reference Include="Microsoft.Web.WebView2.Wpf, Version=1.0.2194.0, Culture=neutral, PublicKeyToken=2a8ab48044d2601e, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Web.WebView2.1.0.2194-prerelease\lib\net45\Microsoft.Web.WebView2.Wpf.dll</HintPath>
     </Reference>
-    <Reference Include="MimeKit, Version=4.14.0.0, Culture=neutral, PublicKeyToken=bede1c8a46c66814, processorArchitecture=MSIL">
-      <HintPath>..\packages\MimeKit.4.14.0\lib\net48\MimeKit.dll</HintPath>
+    <Reference Include="MimeKit, Version=4.15.0.0, Culture=neutral, PublicKeyToken=bede1c8a46c66814, processorArchitecture=MSIL">
+      <HintPath>..\packages\MimeKit.4.15.1\lib\net48\MimeKit.dll</HintPath>
     </Reference>
     <Reference Include="PromptedTextBox, Version=1.0.0.2, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -191,6 +184,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="DisplayLine.vb" />
+    <Compile Include="MarkdownViewer.vb">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="ProgramUpdater.vb" />
     <Compile Include="SiriusCook_ImageViewer.designer.vb">
       <DependentUpon>SiriusCook_ImageViewer.vb</DependentUpon>
@@ -219,6 +215,12 @@
       <DependentUpon>SiriusCook_MaintainLinks.vb</DependentUpon>
     </Compile>
     <Compile Include="SiriusCook_MaintainLinks.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="SiriusCook_MDViewer.Designer.vb">
+      <DependentUpon>SiriusCook_MDViewer.vb</DependentUpon>
+    </Compile>
+    <Compile Include="SiriusCook_MDViewer.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="SiriusCook_OpenBook.designer.vb">
@@ -386,6 +388,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="SiriusCook_MaintainLinks.resx">
       <DependentUpon>SiriusCook_MaintainLinks.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="SiriusCook_MDViewer.resx">
+      <DependentUpon>SiriusCook_MDViewer.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="SiriusCook_OpenBook.resx">
       <DependentUpon>SiriusCook_OpenBook.vb</DependentUpon>
@@ -622,8 +627,6 @@
     <None Include="Resources\dining.ico" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Contents.htm" />
-    <Content Include="Getting Started.htm" />
     <None Include="Resources\Exclamation.64x64.ico" />
     <None Include="Resources\AboutBackground.jpg" />
     <None Include="Resources\Restore.bmp" />
