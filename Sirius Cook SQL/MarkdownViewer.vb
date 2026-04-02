@@ -93,16 +93,29 @@ Public Class MarkdownViewer
 	Public Sub New()
 		Me.DoubleBuffered = True
 		Me.AutoScroll = True
-
-		Dim baseFont = Me.Font
-		_fontBody = baseFont
-		_fontBullet = baseFont
-		_fontHeader1 = New Font(baseFont.FontFamily, baseFont.Size + 6, FontStyle.Bold)
-		_fontHeader2 = New Font(baseFont.FontFamily, baseFont.Size + 3, FontStyle.Bold)
-		_fontHeader3 = New Font(baseFont.FontFamily, baseFont.Size + 1, FontStyle.Bold)
-		_fontAnchor = New Font(baseFont, FontStyle.Underline)
+		Me.Font = MyBase.Font
 	End Sub
+	'*******************************************************************
 
+	' The font property.
+
+	'*******************************************************************
+	Public Overrides Property Font As Font
+		Get
+			Return MyBase.Font
+		End Get
+		Set(value As Font)
+
+			Dim baseFont = value
+			_fontBody = baseFont
+			_fontBullet = baseFont
+			_fontHeader1 = New Font(baseFont.FontFamily, baseFont.Size + 6, FontStyle.Bold)
+			_fontHeader2 = New Font(baseFont.FontFamily, baseFont.Size + 3, FontStyle.Bold)
+			_fontHeader3 = New Font(baseFont.FontFamily, baseFont.Size + 1, FontStyle.Bold)
+			_fontAnchor = New Font(baseFont, FontStyle.Underline)
+			RecalculateLayout()
+		End Set
+	End Property
 	'*******************************************************************
 
 	' Function to return the font for displaying a line.
