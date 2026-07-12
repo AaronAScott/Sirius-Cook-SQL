@@ -503,6 +503,11 @@ Module ProgramUpdater
 		RemoveHandler ListBox1.SelectedIndexChanged, AddressOf Listbox1_SelectedIndexChanged
 		RemoveHandler ListBox1.DrawItem, AddressOf ListBox1_DrawItem
 
+		' Dispose of the form.
+
+		f.Dispose()
+		f = Nothing
+
 		' Return the dialog result.
 
 		Return Result

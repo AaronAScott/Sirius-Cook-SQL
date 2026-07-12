@@ -482,13 +482,14 @@
 		'
 		'txtNotes
 		'
-		Me.txtNotes.ForeColor = System.Drawing.Color.DarkGray
+		Me.txtNotes.ForeColor = System.Drawing.SystemColors.WindowText
 		Me.txtNotes.Location = New System.Drawing.Point(447, 370)
 		Me.txtNotes.Multiline = True
 		Me.txtNotes.Name = "txtNotes"
 		Me.txtNotes.Prompt = "Add additional notes"
 		Me.txtNotes.Size = New System.Drawing.Size(314, 78)
 		Me.txtNotes.TabIndex = 8
+		Me.txtNotes.Text = "Add additional notes"
 		'
 		'txtServings
 		'
@@ -498,6 +499,7 @@
 		Me.txtServings.Prompt = "No. Servings"
 		Me.txtServings.Size = New System.Drawing.Size(72, 20)
 		Me.txtServings.TabIndex = 5
+		Me.txtServings.Text = "No. Servings"
 		'
 		'txtTitle
 		'
@@ -507,6 +509,7 @@
 		Me.txtTitle.Prompt = "Recipe Title"
 		Me.txtTitle.Size = New System.Drawing.Size(301, 20)
 		Me.txtTitle.TabIndex = 1
+		Me.txtTitle.Text = "Recipe Title"
 		'
 		'txtCategory
 		'
@@ -517,15 +520,17 @@
 		Me.txtCategory.Prompt = "Recipe Category"
 		Me.txtCategory.Size = New System.Drawing.Size(173, 20)
 		Me.txtCategory.TabIndex = 2
+		Me.txtCategory.Text = "Recipe Category"
 		'
 		'txtAuthor
 		'
-		Me.txtAuthor.ForeColor = System.Drawing.SystemColors.WindowText
+		Me.txtAuthor.ForeColor = System.Drawing.Color.DarkGray
 		Me.txtAuthor.Location = New System.Drawing.Point(23, 57)
 		Me.txtAuthor.Name = "txtAuthor"
 		Me.txtAuthor.Prompt = "Author's Name or Recipe Source"
 		Me.txtAuthor.Size = New System.Drawing.Size(173, 20)
 		Me.txtAuthor.TabIndex = 3
+		Me.txtAuthor.Text = "Author's Name or Recipe Source"
 		'
 		'txtBlurb
 		'
@@ -536,6 +541,7 @@
 		Me.txtBlurb.Prompt = "Say something about this recipe"
 		Me.txtBlurb.Size = New System.Drawing.Size(301, 47)
 		Me.txtBlurb.TabIndex = 4
+		Me.txtBlurb.Text = "Say something about this recipe"
 		'
 		'txtIngredients
 		'
@@ -547,6 +553,7 @@
 		Me.txtIngredients.ScrollBars = System.Windows.Forms.ScrollBars.Vertical
 		Me.txtIngredients.Size = New System.Drawing.Size(301, 295)
 		Me.txtIngredients.TabIndex = 6
+		Me.txtIngredients.Text = "List the ingredients for the recipe, pressing Enter between each ingredient"
 		'
 		'txtProcedure
 		'
@@ -558,6 +565,7 @@
 		Me.txtProcedure.ScrollBars = System.Windows.Forms.ScrollBars.Vertical
 		Me.txtProcedure.Size = New System.Drawing.Size(314, 304)
 		Me.txtProcedure.TabIndex = 7
+		Me.txtProcedure.Text = "List the steps to making the recipe"
 		'
 		'btnCancel
 		'

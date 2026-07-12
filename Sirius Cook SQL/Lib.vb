@@ -864,9 +864,9 @@ Module CommonLibrary
 		' Assemble the date and return it.
 
 		zx = CStr(d)
-		yr = Val(zx.Substring(3, 2))
-		mo = Val(zx.Substring(5, 2))
-		dy = Val(zx.Substring(7, 2))
+		yr = Val(zx.Substring(2, 2))
+		mo = Val(zx.Substring(4, 2))
+		dy = Val(zx.Substring(6, 2))
 		zx = Format(mo, "00") & "/" & Format(dy, "00") & "/" & Format(yr, "00")
 		SDate = zx
 	End Function
@@ -934,11 +934,13 @@ Module CommonLibrary
 		' replace string.
 
 		zx = Target
-		xx = zx.ToLower.IndexOf(SrchStr.ToLower, StartPos)
-		While xx > 0
-			zx = zx.Substring(0, xx) & ReplStr & zx.Substring(xx + SrchStr.Length)
-			xx = zx.IndexOf(SrchStr, xx + ReplStr.Length)
-		End While
+		If Target.Length > StartPos Then
+			xx = zx.ToLower.IndexOf(SrchStr.ToLower, StartPos)
+			While xx > 0
+				zx = zx.Substring(0, xx) & ReplStr & zx.Substring(xx + SrchStr.Length)
+				xx = zx.IndexOf(SrchStr, xx + ReplStr.Length)
+			End While
+		End If
 		Return zx
 
 	End Function

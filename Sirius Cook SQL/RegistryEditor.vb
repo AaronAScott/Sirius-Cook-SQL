@@ -47,11 +47,11 @@ Public Class frmRegistryEditor
             If vb.Left(Keys(ii), 6) = "Sirius" Then
                 n = TreeView1.Nodes.Add(Keys(ii), Keys(ii))
 
-                ' If the current node is for this program, it will be displayed in black.  If for
-                ' some other Sirius program, it will be displayed in gray.
+                    ' If the current node is for this program, it will be displayed in black.  If for
+                    ' some other Sirius program, it will be displayed in gray.
 
-                If n.Name = "Sirius" & SRep(ProgramName, 1, " ", "") Then c = Color.Black Else c = Color.Gray
-                n.ForeColor = c
+                    If n.Name = "Sirius" & ProgramName.Replace(" ", "") Or n.Name = "SiriusSoftwareGlobal" Then c = Color.Black Else c = Color.Gray
+                    n.ForeColor = c
 
                 ' Get all the subkeys for the current node.
 
@@ -101,9 +101,9 @@ Public Class frmRegistryEditor
 
         Select Case e.Node.Level
             Case 0 ' The main node for a Sirius program
-                If e.Node.Name = "Sirius" & SRep(ProgramName, 1, " ", "") Then btnReset.Enabled = True Else btnReset.Enabled = False
+                If e.Node.Name = "Sirius" & ProgramName.Replace(" ","") Then btnReset.Enabled = True Else btnReset.Enabled = False
             Case 2 ' A group of settings for a program
-                If e.Node.Parent.Parent.Name = "Sirius" & SRep(ProgramName, 1, " ", "") Then btnReset.Enabled = True Else btnReset.Enabled = False
+                If e.Node.Parent.Parent.Name = "Sirius" & ProgramName.Replace(" ","") Then btnReset.Enabled = True Else btnReset.Enabled = False
                 r3 = r2.OpenSubKey(e.Node.Parent.Parent.Name)
                 r4 = r3.OpenSubKey(e.Node.Parent.Name)
                 TextBox1.Text = r4.GetValue(e.Node.Name)

@@ -910,7 +910,7 @@ Friend Class frmOpenBook
 	' One of the entry fields has got the focus.
 	'
 	'*******************************************************
-	Private Sub Text_Enter(ByVal eventSender As System.Object, ByVal eventArgs As System.EventArgs) Handles txtTitle.Enter, txtCategory.Enter, txtAuthor.Enter, txtBlurb.Enter, txtServings.Enter, txtIngredients.Enter, txtProcedure.Enter
+	Private Sub Text_Enter(ByVal eventSender As System.Object, ByVal eventArgs As System.EventArgs) Handles txtTitle.Enter, txtCategory.Enter, txtAuthor.Enter, txtBlurb.Enter, txtServings.Enter, txtIngredients.Enter, txtProcedure.Enter, txtNotes.Enter
 
 		' Make sure no text is selected.
 
