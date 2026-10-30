@@ -7,6 +7,9 @@ Imports System.Text.RegularExpressions
 Imports Org.BouncyCastle.Asn1
 Imports vb = Microsoft.VisualBasic
 Imports System.Diagnostics
+Imports System.Text
+Imports System.Text.json
+
 Module SiriusCook_Module1
 	'**************************************************
 	' SiriusCook SQL program module 1
@@ -724,6 +727,7 @@ Module SiriusCook_Module1
 
 		frmMain.mnuCloseFile.Enabled = State
 		frmMain.CookbookMenu.Enabled = State
+		frmMain.mnuExportJSON.Enabled = State
 		frmMain.mnuRecent.Enabled = State
 		frmMain.mnuFavorites.Enabled = State
 		frmMain.mnuBackupDatabase.Enabled = State
@@ -2006,6 +2010,24 @@ Module SiriusCook_Module1
 	End Function
 	'**************************************************
 
+	' Function to escape JSON text.
+
+	'**************************************************
+	Private Function EscapeJson(Text As String) As String
+
+		If String.IsNullOrEmpty(Text) Then Return ""
+
+		Return Text _
+	   .Replace("\", "\\") _
+	   .Replace("""", "\""") _
+	   .Replace(vbCrLf, "\n") _
+	   .Replace(vbCr, "\n") _
+	   .Replace(vbLf, "\n") _
+	   .Replace(vbTab, "\t")
+
+	End Function
+	'**************************************************
+
 	' Function to nescape characters that cannot be used
 	' in the XML Exchange Format for recipes.
 
@@ -2552,6 +2574,79 @@ Module SiriusCook_Module1
 	End Function
 	'**********************************************************
 
+	' Sub to export the database as a JSON file.
+
+	'**********************************************************
+	Public Sub ExportDatabaseAsJSON()
+
+		' Declare variables.
+
+		Dim RecipeCount As Integer = 0
+		Dim jj As Integer
+		Dim JSON As New StringBuilder
+		Dim ds As New DataSet
+		Dim dt As DataTable
+
+		' Display save dialog and get output file name (defaults to "recipes")
+
+		frmMain.SaveFileDialog1.FileName = "recipes.json"
+		frmMain.SaveFileDialog1.DefaultExt = "json"
+		frmMain.SaveFileDialog1.Filter = "JSON Files (*.json)|*.json"
+		If frmMain.SaveFileDialog1.ShowDialog() = DialogResult.OK Then
+
+			' Create dataset.
+
+			RecipesDA.SelectCommand = New SqlCommand("SELECT * FROM tblRecipes ORDER BY ID", DB)
+			RecipesDA.Fill(ds, "Table")
+			dt = ds.Tables("Table")
+			RecipeCount = dt.Rows.Count
+
+			' Create the beginning of the JSON file.
+
+			JSON.Append("{" & vbCrLf)
+			JSON.Append("    ""version"": 1," & vbCrLf)
+			JSON.Append("    ""generated"": """ & Today.ToString("yyyy-MM-dd") & """," & vbCrLf)
+			JSON.Append("    ""recipeCount"": " & CStr(RecipeCount) & "," & vbCrLf)
+			JSON.Append("    ""recipes"": [" & vbCrLf)
+
+			' Begin loop of reading and writing recipe records
+
+			For jj = 0 To dt.Rows.Count - 1
+				JSON.Append("        {" & vbCrLf)
+				JSON.Append("        ""ID"": " & dt.Rows(jj)("ID") & "," & vbCrLf)
+				JSON.Append("        ""RecipeName"": " & """" & EscapeJson(dt.Rows(jj)("RecipeName")) & """," & vbCrLf)
+				JSON.Append("        ""Blurb"": " & """" & EscapeJson(GetR(dt.Rows(jj), "Blurb")) & """," & vbCrLf)
+				JSON.Append("        ""Author"": " & """" & EscapeJson(GetR(dt.Rows(jj), "Author")) & """," & vbCrLf)
+				JSON.Append("        ""Category"": " & """" & EscapeJson(dt.Rows(jj)("Category")) & """," & vbCrLf)
+				JSON.Append("        ""Servings"": " & """" & EscapeJson(GetR(dt.Rows(jj), "Servings")) & """," & vbCrLf)
+				JSON.Append("        ""Ingredients"": " & """" & EscapeJson(FormatIngredients(dt.Rows(jj)("ID"))) & """," & vbCrLf)
+				JSON.Append("        ""Procedure"": " & """" & EscapeJson(dt.Rows(jj)("Procedure")) & """," & vbCrLf)
+				JSON.Append("        ""Notes"": " & """" & EscapeJson(GetR(dt.Rows(jj), "Notes")) & """" & vbCrLf)
+				If jj < dt.Rows.Count - 1 Then
+					JSON.Append("        }," & vbCrLf)
+				Else
+					JSON.Append("        }" & vbCrLf)
+				End If
+			Next jj
+
+			' Close brackets
+
+			JSON.Append("    ]" & vbCrLf)
+			JSON.Append("}" & vbCrLf)
+
+			' Write out text
+
+			My.Computer.FileSystem.WriteAllText(frmMain.SaveFileDialog1.FileName, JSON.ToString, False)
+
+			' Restore select command.
+
+			RecipesDA.SelectCommand = RecipesSelectCommand()
+			ds.Dispose()
+
+		End If
+	End Sub
+	'**********************************************************
+
 	' Function to properly escape non-Ascii characters in an
 	' RTF file.
 
@@ -2573,10 +2668,10 @@ Module SiriusCook_Module1
 
 				' Extended Latin: escape as \'hh using ANSI codepage
 			ElseIf code > 126 And code <= 255 Then
-				rtfBuilder.Append("\'" & Hex(code).ToLower())
+				rtfBuilder.Append(" \'" & Hex(code).ToLower())
 
 				' Unicode beyond ANSI—encode as \uN?
-			ElseIf code > 255 Then
+				ElseIf code > 255 Then
 				rtfBuilder.Append("\u" & code & "?")
 			End If
 		Next ch
@@ -2720,9 +2815,9 @@ Module SiriusCook_Module1
 
 		Catch ex As Exception
 			MsgBox("Error verifying SQL Server LocalDB:" & vbCrLf & ex.Message, MsgBoxStyle.Information, "LocalDB Error")
-				Return False
-			End Try
-		End Function
+			Return False
+		End Try
+	End Function
 
 	'**************************************************
 	'

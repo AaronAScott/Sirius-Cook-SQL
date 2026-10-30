@@ -79,6 +79,7 @@
 		Me.mnuProperties = New System.Windows.Forms.ToolStripMenuItem()
 		Me.MRUSeparator = New System.Windows.Forms.ToolStripSeparator()
 		Me.FileMenuSep3 = New System.Windows.Forms.ToolStripSeparator()
+		Me.mnuExportJSON = New System.Windows.Forms.ToolStripMenuItem()
 		Me.mnuExit = New System.Windows.Forms.ToolStripMenuItem()
 		Me.CookbookMenu = New System.Windows.Forms.ToolStripMenuItem()
 		Me.mnuNewBook = New System.Windows.Forms.ToolStripMenuItem()
@@ -127,6 +128,7 @@
 		Me.PrintDocument1 = New System.Drawing.Printing.PrintDocument()
 		Me.PrintPreviewDialog1 = New System.Windows.Forms.PrintPreviewDialog()
 		Me.timBackupStatus = New System.Windows.Forms.Timer(Me.components)
+		Me.ToolStripSeparator3 = New System.Windows.Forms.ToolStripSeparator()
 		Me.picBookshelf_0.SuspendLayout()
 		CType(Me.Image1, System.ComponentModel.ISupportInitialize).BeginInit()
 		Me.MainMenu1.SuspendLayout()
@@ -196,28 +198,28 @@
 		'MRU1
 		'
 		Me.MRU1.Name = "MRU1"
-		Me.MRU1.Size = New System.Drawing.Size(163, 22)
+		Me.MRU1.Size = New System.Drawing.Size(212, 22)
 		Me.MRU1.Text = "&1"
 		Me.MRU1.Visible = False
 		'
 		'MRU2
 		'
 		Me.MRU2.Name = "MRU2"
-		Me.MRU2.Size = New System.Drawing.Size(163, 22)
+		Me.MRU2.Size = New System.Drawing.Size(212, 22)
 		Me.MRU2.Text = "&2"
 		Me.MRU2.Visible = False
 		'
 		'MRU3
 		'
 		Me.MRU3.Name = "MRU3"
-		Me.MRU3.Size = New System.Drawing.Size(163, 22)
+		Me.MRU3.Size = New System.Drawing.Size(212, 22)
 		Me.MRU3.Text = "&3"
 		Me.MRU3.Visible = False
 		'
 		'MRU4
 		'
 		Me.MRU4.Name = "MRU4"
-		Me.MRU4.Size = New System.Drawing.Size(163, 22)
+		Me.MRU4.Size = New System.Drawing.Size(212, 22)
 		Me.MRU4.Text = "&4"
 		Me.MRU4.Visible = False
 		'
@@ -231,7 +233,7 @@
 		'
 		'FileMenu
 		'
-		Me.FileMenu.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuNewFile, Me.mnuOpenFile, Me.mnuCloseFile, Me.FileMenuSep1, Me.mnuProperties, Me.MRUSeparator, Me.MRU1, Me.MRU2, Me.MRU3, Me.MRU4, Me.FileMenuSep3, Me.mnuExit})
+		Me.FileMenu.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuNewFile, Me.mnuOpenFile, Me.mnuCloseFile, Me.FileMenuSep1, Me.mnuProperties, Me.MRUSeparator, Me.MRU1, Me.MRU2, Me.MRU3, Me.MRU4, Me.FileMenuSep3, Me.mnuExportJSON, Me.ToolStripSeparator3, Me.mnuExit})
 		Me.FileMenu.Name = "FileMenu"
 		Me.FileMenu.Size = New System.Drawing.Size(37, 20)
 		Me.FileMenu.Text = "&File"
@@ -239,48 +241,55 @@
 		'mnuNewFile
 		'
 		Me.mnuNewFile.Name = "mnuNewFile"
-		Me.mnuNewFile.Size = New System.Drawing.Size(163, 22)
+		Me.mnuNewFile.Size = New System.Drawing.Size(212, 22)
 		Me.mnuNewFile.Text = "&New Database..."
 		'
 		'mnuOpenFile
 		'
 		Me.mnuOpenFile.Name = "mnuOpenFile"
-		Me.mnuOpenFile.Size = New System.Drawing.Size(163, 22)
+		Me.mnuOpenFile.Size = New System.Drawing.Size(212, 22)
 		Me.mnuOpenFile.Text = "&Open Database..."
 		'
 		'mnuCloseFile
 		'
 		Me.mnuCloseFile.Enabled = False
 		Me.mnuCloseFile.Name = "mnuCloseFile"
-		Me.mnuCloseFile.Size = New System.Drawing.Size(163, 22)
+		Me.mnuCloseFile.Size = New System.Drawing.Size(212, 22)
 		Me.mnuCloseFile.Text = "&Close Database"
 		'
 		'FileMenuSep1
 		'
 		Me.FileMenuSep1.Name = "FileMenuSep1"
-		Me.FileMenuSep1.Size = New System.Drawing.Size(160, 6)
+		Me.FileMenuSep1.Size = New System.Drawing.Size(209, 6)
 		'
 		'mnuProperties
 		'
 		Me.mnuProperties.Name = "mnuProperties"
-		Me.mnuProperties.Size = New System.Drawing.Size(163, 22)
+		Me.mnuProperties.Size = New System.Drawing.Size(212, 22)
 		Me.mnuProperties.Text = "&Properties"
 		'
 		'MRUSeparator
 		'
 		Me.MRUSeparator.Name = "MRUSeparator"
-		Me.MRUSeparator.Size = New System.Drawing.Size(160, 6)
+		Me.MRUSeparator.Size = New System.Drawing.Size(209, 6)
 		Me.MRUSeparator.Visible = False
 		'
 		'FileMenuSep3
 		'
 		Me.FileMenuSep3.Name = "FileMenuSep3"
-		Me.FileMenuSep3.Size = New System.Drawing.Size(160, 6)
+		Me.FileMenuSep3.Size = New System.Drawing.Size(209, 6)
+		'
+		'mnuExportJSON
+		'
+		Me.mnuExportJSON.Enabled = False
+		Me.mnuExportJSON.Name = "mnuExportJSON"
+		Me.mnuExportJSON.Size = New System.Drawing.Size(212, 22)
+		Me.mnuExportJSON.Text = "Export Database as &JSON..."
 		'
 		'mnuExit
 		'
 		Me.mnuExit.Name = "mnuExit"
-		Me.mnuExit.Size = New System.Drawing.Size(163, 22)
+		Me.mnuExit.Size = New System.Drawing.Size(212, 22)
 		Me.mnuExit.Text = "E&xit"
 		'
 		'CookbookMenu
@@ -443,19 +452,19 @@
 		'mnuAbout
 		'
 		Me.mnuAbout.Name = "mnuAbout"
-		Me.mnuAbout.Size = New System.Drawing.Size(180, 22)
+		Me.mnuAbout.Size = New System.Drawing.Size(166, 22)
 		Me.mnuAbout.Text = "About SiriusCook"
 		'
 		'mnuViewReadMe
 		'
 		Me.mnuViewReadMe.Name = "mnuViewReadMe"
-		Me.mnuViewReadMe.Size = New System.Drawing.Size(180, 22)
+		Me.mnuViewReadMe.Size = New System.Drawing.Size(166, 22)
 		Me.mnuViewReadMe.Text = "View &ReadMe"
 		'
 		'mnuViewLicense
 		'
 		Me.mnuViewLicense.Name = "mnuViewLicense"
-		Me.mnuViewLicense.Size = New System.Drawing.Size(180, 22)
+		Me.mnuViewLicense.Size = New System.Drawing.Size(166, 22)
 		Me.mnuViewLicense.Text = "View &License"
 		'
 		'ToolStrip1
@@ -625,6 +634,11 @@
 		'
 		Me.timBackupStatus.Interval = 30000
 		'
+		'ToolStripSeparator3
+		'
+		Me.ToolStripSeparator3.Name = "ToolStripSeparator3"
+		Me.ToolStripSeparator3.Size = New System.Drawing.Size(209, 6)
+		'
 		'frmMain
 		'
 		Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 14.0!)
@@ -689,5 +703,7 @@
 	Friend WithEvents ToolStripMenuItem2 As ToolStripSeparator
 	Friend WithEvents mnuViewReadMe As ToolStripMenuItem
 	Friend WithEvents mnuViewLicense As ToolStripMenuItem
+	Friend WithEvents mnuExportJSON As ToolStripMenuItem
+	Friend WithEvents ToolStripSeparator3 As ToolStripSeparator
 #End Region
 End Class

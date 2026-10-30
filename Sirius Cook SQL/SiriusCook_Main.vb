@@ -238,6 +238,14 @@ Friend Class frmMain
 
 	End Sub
 	'***************************************************************
+
+	' The Export Database as JSON menu option is selected.
+
+	'***************************************************************
+	Public Sub mnuExportJSON_Click(sender As Object, e As EventArgs) Handles mnuExportJSON.Click
+		ExportDatabaseAsJSON()
+	End Sub
+	'***************************************************************
 	'
 	' The Help Contents menu option is selected.
 	'
