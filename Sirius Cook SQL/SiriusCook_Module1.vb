@@ -2604,7 +2604,7 @@ Module SiriusCook_Module1
 			' Create the beginning of the JSON file.
 
 			JSON.Append("{" & vbCrLf)
-			JSON.Append("    ""version"": 1," & vbCrLf)
+			JSON.Append("    ""version"": ""1.0""," & vbCrLf)
 			JSON.Append("    ""generated"": """ & Today.ToString("yyyy-MM-dd") & """," & vbCrLf)
 			JSON.Append("    ""recipeCount"": " & CStr(RecipeCount) & "," & vbCrLf)
 			JSON.Append("    ""recipes"": [" & vbCrLf)

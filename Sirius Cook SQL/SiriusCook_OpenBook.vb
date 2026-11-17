@@ -1851,7 +1851,7 @@ Friend Class frmOpenBook
 		' start/stop codes for the displayed link.  The resulting procedure text will look like
 		' this: "some normal text <H Ref=1234>Link Text</H> some more normal text."
 
-		If LinksTable.Rows.Count > 0 Then
+		If Not LinksTable Is Nothing AndAlso LinksTable.Rows.Count > 0 Then
 			For jj = 0 To LinksTable.Rows.Count - 1
 				ii = InStr(1, zx, GetR(LinksTable.Rows(jj), "LinkText"), CompareMethod.Text)
 				If ii > 0 Then
@@ -2566,9 +2566,9 @@ Friend Class frmOpenBook
 		' If a start letter is specified, which refers to the
 		' first category that begins with that letter,move to that
 		' place in the dataset
-		Debug.Print("Show Recipes start: " & CurrentRecipeRow)
+
 		If StartLetter <> "" Then
-			xx = toc.FindCategory(StartLetter)
+			xx = toc.FindRecipe("Category>='" & StartLetter & "'")
 			If xx <> NOMATCH Then
 				CurrentRecipeRow = xx
 				zz = toc(CurrentRecipeRow)("Category").ToUpper.Chars(0)
@@ -2700,7 +2700,6 @@ Friend Class frmOpenBook
 		Dim ImageData() As Byte
 		Dim ms As MemoryStream
 
-		Debug.Print("Show Recipe: " & CurrentRecipeRow)
 		' If we received one of the direction specifiers, move as specified.
 
 		If Category = CStr(Beginning) And toc.Count > 0 Then CurrentRecipeRow = 0
@@ -3348,6 +3347,11 @@ Friend Class frmOpenBook
 
 		Dim ii As Integer = 0
 
+		' Show that we're loading.
+
+		frmMain.StatusLabel.Text = "Loading cookbook..."
+		Application.DoEvents()
+
 		' Build the table of contents
 
 		toc = New TableOfContents(BookID)
@@ -3388,6 +3392,13 @@ Friend Class frmOpenBook
 		LeftTabImage = My.Resources.TabBlank
 		RightTabImage = My.Resources.TOC
 
+		' Show that we're finished loading.
+
+		frmMain.StatusLabel.Text = ""
+		Application.DoEvents()
+
+
+		Exit Sub
 
 TryAgain:
 

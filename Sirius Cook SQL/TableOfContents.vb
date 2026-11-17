@@ -159,7 +159,7 @@ DuplicateName:
 		' we find a new one, add it to the list of categories.
 
 		For ii = 0 To RecipeList.Count - 1
-			zx = RecipeList.ElementAt(ii).Key
+			zx = RecipeList.ElementAt(ii).Key.Split("."c)(0)
 			If zx <> LastCategory Then
 				CatList(jj) = zx
 				jj += 1
@@ -215,7 +215,7 @@ DuplicateName:
 		' far as the length of the specified partial key.
 
 		For ii = 0 To c.Count - 1
-			If c(ii).Length >= key.Length AndAlso c(ii).Substring(0, key.Length).ToLower = key.ToLower Then
+			If c(ii).Length >= key.Length AndAlso c(ii).Substring(0, key.Length).ToLower >= key.ToLower Then
 				Return ii
 			End If
 		Next ii
@@ -274,7 +274,7 @@ DuplicateName:
 			' Add the category/recipe combination.
 
 			jj = 0
-			RecipeList.Add(RecEntry.RecipeName & "." & RecEntry.RecipeName & xx, RecEntry)
+			RecipeList.Add(RecEntry.Category & "." & RecEntry.RecipeName & xx, RecEntry)
 		Next ii
 
 
@@ -300,78 +300,18 @@ DuplicateName:
 	'          the criteria.
 
 	'**************************************************
-	Public Function FindRecipe(Criteria As String, Optional IgnoreBlanks As Boolean = False) As DataRow
+	Public Function FindRecipe(Criteria As String) As Integer
 
 		' Declare variables
 
-		Dim jj As Integer
-		Dim FieldToSearch As String = ""
-		Dim xx As String = ""
-		Dim zx As Object = Nothing
-		Dim Compare As String = ""
-		Dim CompareValue As Object = Nothing
+		Dim dt As DataRow()
 
-		' Begin parsing the string
-
-		For jj = 1 To Len(Criteria)
-
-			' Once we encounter a comparison string, the field to search is the value before that position.
-
-			zx = Mid(Criteria, jj, 1)
-			If zx = "=" Or zx = "<" Or zx = ">" And FieldToSearch = "" Then
-				FieldToSearch = Trim(vb.Left(Criteria, jj - 1))
-
-				' Now look for the comparison operator
-
-				xx = Mid(Criteria, jj, 2)
-				If xx <> "<>" And xx <> "<=" And xx <> ">=" Then
-					xx = Mid(Criteria, jj, 1)
-					Compare = Mid(Criteria, jj + 1)
-				Else
-					Compare = Mid(Criteria, jj + 2)
-				End If
-
-				Exit For
-			End If
-		Next jj
-
-		' Now convert the comparison value to a string or a value.
-
-		If Compare.Chars(0) = "'" Then
-			CompareValue = Compare.Replace("'", "").ToLower
+		dt = RecipesTable.Select(Criteria, "Category ASC,RecipeName ASC")
+		If dt.Count > 0 Then
+			Return RecipesTable.Rows.IndexOf(dt(0))
 		Else
-			CompareValue = Compare
+			Return NOMATCH
 		End If
-
-		' Begin searching the data table. If any errors occur, return a NOMATCH.
-
-		Try
-			For jj = 0 To RecipesTable.Rows.Count - 1
-				zx = GetR(RecipesTable.Rows(jj), FieldToSearch) ' Lower case everything for a case-insensitive search
-				If IgnoreBlanks Then zx = Trim(zx)
-				Select Case xx
-					Case "="
-						If zx = CompareValue Then Return RecipesTable.Rows(jj)
-					Case "<>"
-						If zx <> CompareValue Then Return RecipesTable.Rows(jj)
-					Case "<"
-						If zx < CompareValue Then Return RecipesTable.Rows(jj)
-					Case ">"
-						If zx > CompareValue Then Return RecipesTable.Rows(jj)
-					Case ">="
-						If zx >= CompareValue Then Return RecipesTable.Rows(jj)
-					Case "<="
-						If zx <= CompareValue Then Return RecipesTable.Rows(jj)
-				End Select
-			Next jj
-		Catch
-			Return Nothing
-		End Try
-
-		' If we didn't find anything, return nothing
-
-		Return Nothing
-
 	End Function
 
 	'**************************************************

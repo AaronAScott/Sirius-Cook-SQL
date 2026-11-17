@@ -511,7 +511,9 @@ Friend Class frmMain
 
 		For jj = 1 To gLibrary.CookBooks.Count()
 			If gLibrary.CookBooks.Item(jj).Selected = True Then
+				Me.UseWaitCursor = True
 				gLibrary.CookBooks.Item(jj).OpenBook()
+				Me.UseWaitCursor = False
 			End If
 		Next jj
 		gLibrary.Show()
